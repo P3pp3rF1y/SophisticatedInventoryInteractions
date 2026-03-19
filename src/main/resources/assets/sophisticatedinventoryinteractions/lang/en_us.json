@@ -1,0 +1,8 @@
+{
+  "key.category.sophisticatedinventoryinteractions.main": "Sophisticated Inventory Interactions",
+  "gui.sophisticatedinventoryinteractions.search_hint": "Search",
+  "gui.sophisticatedinventoryinteractions.sort_container": "Sort container inventory",
+  "gui.sophisticatedinventoryinteractions.sort_player": "Sort player inventory",
+  "gui.sophisticatedinventoryinteractions.transfer_to_container": "Transfer to container inventory",
+  "gui.sophisticatedinventoryinteractions.transfer_to_player": "Transfer to player inventory"
+}
