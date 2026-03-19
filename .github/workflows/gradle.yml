@@ -1,0 +1,11 @@
+name: Mod Build
+
+on: [ workflow_dispatch, push ]
+
+jobs:
+  mod_build:
+    permissions:
+      contents: read
+      packages: write
+    uses: P3pp3rF1y/MultiWorkspace/.github/workflows/mod-build-template.yml@1.21.x
+    secrets: inherit
