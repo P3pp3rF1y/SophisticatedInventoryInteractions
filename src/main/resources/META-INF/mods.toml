@@ -1,0 +1,37 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "All Rights Reserved"
+issueTrackerURL = "https://github.com/P3pp3rF1y/SophisticatedInventoryInteractions/issues"
+displayURL = "https://github.com/P3pp3rF1y"
+logoFile = "logo.png"
+credits = "Created by P3pp3rF1y."
+authors = "P3pp3rF1y"
+
+[[mods]]
+modId = "sophisticatedinventoryinteractions"
+version = "${mod_full_version}"
+displayName = "Sophisticated Inventory Interactions"
+description = '''
+Adds Sophisticated-style search, sorting, and transfer controls to eligible non-Sophisticated container screens.
+'''
+
+[[dependencies.sophisticatedinventoryinteractions]]
+modId = "forge"
+mandatory = true
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.sophisticatedinventoryinteractions]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.sophisticatedinventoryinteractions]]
+modId = "sophisticatedcore"
+mandatory = true
+versionRange = "${sc_version}"
+ordering = "AFTER"
+side = "BOTH"

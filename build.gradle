@@ -1,0 +1,307 @@
+plugins {
+    id 'idea'
+    id "org.sonarqube" version "5.0.0.4638"
+    id "maven-publish"
+    id 'net.neoforged.gradle' version '[6.0.18,6.2)'
+    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id "net.darkhax.curseforgegradle" version "1.1.15"
+    id "com.modrinth.minotaur" version "2.+"
+    id 'org.spongepowered.mixin' version '0.7.+'
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+version = "${project.minecraft_version}-${project.mod_version}.${getBuildNumber()}${getStable()}"
+group = mod_group_id
+
+repositories {
+    mavenCentral()
+    maven { url = "https://libraries.minecraft.net/" }
+    maven { url = "https://modmaven.dev/" }
+    maven { url "https://minecraft.curseforge.com/api/maven/" }
+    maven {
+        url "https://www.cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+    maven { url "https://maven.blamejared.com/" }
+    maven {
+        name = "GHPCore"
+        url = uri("https://maven.pkg.github.com/p3pp3rf1y/sophisticatedcore")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+        content {
+            includeModule("net.p3pp3rf1y", "sophisticatedcore")
+        }
+    }
+}
+
+base {
+    archivesName = mod_id
+}
+
+group = mod_group_id
+version = "${project.minecraft_version}-${project.mod_version}.${getBuildNumber()}"
+archivesBaseName = mod_id
+
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '17'
+
+minecraft {
+    mappings channel: 'parchment', version: "$parchment_version"
+    copyIdeResources = true
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+    runs {
+        configureEach {
+            workingDirectory project.file("run/${it.name}")
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+            property "mixin.env.disableRefMap", "true"
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+                if (findProject(':SophisticatedCore') != null) {
+                    "sophisticatedcore" {
+                        source project(':SophisticatedCore').sourceSets.main
+                    }
+                }
+            }
+        }
+        client {
+        }
+        server {
+        }
+        data {
+            property 'fml.earlyprogresswindow', 'false'
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/')
+        }
+    }
+}
+
+sourceSets.main.resources {
+    srcDir 'src/generated/resources'
+}
+
+dependencies {
+    if (findProject(':SophisticatedCore') != null) {
+        implementation project(':SophisticatedCore')
+    } else {
+        implementation fg.deobf("net.p3pp3rf1y:sophisticatedcore:${sc_version}") {
+            transitive = false
+        }
+        testImplementation fg.deobf("net.p3pp3rf1y:sophisticatedcore:${sc_version}") {
+            transitive = false
+        }
+    }
+
+    minecraft "net.neoforged:forge:${minecraft_version}-${neo_version}"
+}
+
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+            minecraft_version   : minecraft_version, minecraft_version_range: minecraft_version_range,
+            neo_version         : neo_version, neo_version_range: neo_version_range,
+            loader_version_range: loader_version_range,
+            sc_version          : "[" + sc_version.substring(sc_version.indexOf("-") + 1, sc_version.lastIndexOf(',')) + ",)",
+            mod_id              : mod_id,
+            mod_full_version    : "${project.mod_version}.${getBuildNumber()}"
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    manifest {
+        attributes(["Specification-Title"     : project.mod_id,
+                    "Specification-Vendor"    : project.mod_id,
+                    "Specification-Version"   : "1",
+                    "Implementation-Title"    : project.name,
+                    "Implementation-Version"  : "${version}",
+                    "Implementation-Vendor"   : project.mod_id,
+                    "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],)
+    }
+}
+
+static def getBuildNumber() {
+    if (System.getenv("GITHUB_RUN_NUMBER") != null) {
+        return System.getenv("GITHUB_RUN_NUMBER").toString()
+    }
+    return ""
+}
+
+static def getStable() {
+    if (System.getenv("GITHUB_REF") == null || System.getenv("GITHUB_REF").endsWith("-dev")) {
+        return "-SNAPSHOT"
+    }
+    return ""
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("${github_package_url}")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+    publications {
+        gpr(MavenPublication) {
+            artifactId = mod_id
+            from(components.java)
+        }
+    }
+}
+
+if (project.hasProperty('sonar_project_key') && project.sonar_project_key) {
+    sonar {
+        properties {
+            property "sonar.organization", "p3pp3rf1y-github"
+            property "sonar.projectKey", "${sonar_project_key}"
+        }
+    }
+}
+
+task generateChangelog {
+    doLast {
+        def changelog = new StringBuilder()
+
+        def removeHighUnicodeChars = { text ->
+            text.codePoints()
+                    .filter { codePoint -> codePoint <= 0x007F }
+                    .collect { codePoint -> new String(Character.toChars(codePoint)) }
+                    .join('')
+        }
+
+        def formatMultilineMessage = { message ->
+            def lines = message.split('\n')
+            def formattedMessage = lines[0].trim()
+            if (lines.size() > 1) {
+                formattedMessage += "\n" + lines[1..-1].collect { line ->
+                    def trimmedLine = line.trim()
+                    if (trimmedLine.startsWith('-')) {
+                        trimmedLine = trimmedLine.substring(1).trim()
+                    }
+                    "    - ${trimmedLine}"
+                }.join('\n')
+            }
+            return formattedMessage
+        }
+
+        def removeDevSection = { message ->
+            def devIndex = message.indexOf('[DEV]')
+            if (devIndex != -1) {
+                return message.substring(0, devIndex).trim()
+            }
+            return message
+        }
+
+        def latestCommitHash = "git rev-parse HEAD".execute().text.trim()
+        def parentCommits = "git rev-list --parents -n 1 ${latestCommitHash}".execute().text.split()
+
+        def commitMessages = []
+        if (parentCommits.size() > 2) {
+            def firstParent = parentCommits[1]
+            def secondParent = parentCommits[2]
+            def gitLogCommand = [
+                    "bash", "-c", "git log --pretty=format:%B ${firstParent}..${secondParent}"
+            ]
+            commitMessages = gitLogCommand.execute().text.split('\n\n')
+        } else {
+            commitMessages = "git log -1 --pretty=%B".execute().text.split('\n\n')
+        }
+
+        def features = []
+        def fixes = []
+        commitMessages.each { commitMessage ->
+            commitMessage = removeHighUnicodeChars(commitMessage)
+            commitMessage = removeDevSection(commitMessage)
+
+            if (commitMessage.startsWith('feat: ')) {
+                features.add(commitMessage.replaceFirst('feat: ', '').trim())
+            } else if (commitMessage.startsWith('fix: ')) {
+                fixes.add(commitMessage.replaceFirst('fix: ', '').trim())
+            }
+        }
+
+        if (features) {
+            changelog.append("### Features\n")
+            features.each { feature -> changelog.append("- ${formatMultilineMessage(feature)}\n") }
+        }
+
+        if (fixes) {
+            changelog.append("### Fixes\n")
+            fixes.each { fix -> changelog.append("- ${formatMultilineMessage(fix)}\n") }
+        }
+
+        project.ext.changelog = changelog.toString()
+    }
+    project.ext.changelog = ""
+}
+
+def hasCurseforgeId = project.hasProperty('curseforge_id') && project.curseforge_id?.toString()?.trim()
+if (hasCurseforgeId) {
+    task curseforge(type: net.darkhax.curseforgegradle.TaskPublishCurseForge) {
+        dependsOn 'generateChangelog'
+
+        apiToken = System.getenv("CURSEFORGE_TOKEN")
+        def mainFile = upload(project.curseforge_id, file("${project.buildDir}/libs/${archivesBaseName}-${version}.jar"))
+        mainFile.changelogType = 'markdown'
+        mainFile.changelog = { project.ext.changelog }
+        mainFile.addModLoader('Forge')
+        mainFile.releaseType = "${release_type}"
+        "${release_versions}".split(',').each {
+            mainFile.addGameVersion("${it}")
+        }
+        mainFile.addRequirement('sophisticated-core')
+        onlyIf { !project.ext.changelog.isEmpty() }
+    }
+} else {
+    tasks.register('curseforge') {
+        doLast {
+            logger.lifecycle("Skipping curseforge publish: curseforge_id not configured")
+        }
+    }
+}
+
+def hasModrinthId = project.hasProperty('modrinth_project_id') && project.modrinth_project_id?.toString()?.trim()
+modrinth {
+    token = System.getenv("MODRINTH_TOKEN")
+    projectId = hasModrinthId ? "${modrinth_project_id}" : ""
+    versionType = "${release_type}"
+    uploadFile = jar
+    gameVersions = "${release_versions}".split(',').collect { e -> e }
+    loaders = ["forge"]
+    dependencies {
+        required.project "sophisticated-core"
+    }
+    changelog = provider {
+        project.ext.changelog
+    }
+}
+tasks.modrinth {
+    dependsOn(tasks.generateChangelog)
+    onlyIf { hasModrinthId && !project.ext.changelog.isEmpty() }
+}
+
+task printVersionName {
+    println "version:" + project.version
+}
