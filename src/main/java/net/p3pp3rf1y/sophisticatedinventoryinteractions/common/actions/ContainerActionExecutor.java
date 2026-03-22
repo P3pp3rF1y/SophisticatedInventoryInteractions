@@ -64,6 +64,8 @@ public class ContainerActionExecutor {
 			return false;
 		}
 
+		mergeStacks(stacks);
+
 		stacks.sort(getComparator(sortBy));
 
 		for (ItemStack stack : stacks) {
@@ -177,6 +179,31 @@ public class ContainerActionExecutor {
 		}
 
 		return source.getCount() != originalCount;
+	}
+
+	private void mergeStacks(List<ItemStack> stacks) {
+		Map<ItemStackKey, ItemStack> stackTemplates = new LinkedHashMap<>();
+		Map<ItemStackKey, Integer> countsByType = new LinkedHashMap<>();
+
+		for (ItemStack stack : stacks) {
+			ItemStackKey key = toItemStackKey(stack);
+			stackTemplates.putIfAbsent(key, stack.copy());
+			countsByType.merge(key, stack.getCount(), Integer::sum);
+		}
+
+		stacks.clear();
+		for (Map.Entry<ItemStackKey, Integer> entry : countsByType.entrySet()) {
+			ItemStack template = stackTemplates.get(entry.getKey());
+			int remaining = entry.getValue();
+			int maxStackSize = template.getMaxStackSize();
+			while (remaining > 0) {
+				ItemStack mergedStack = template.copy();
+				int count = Math.min(remaining, maxStackSize);
+				mergedStack.setCount(count);
+				stacks.add(mergedStack);
+				remaining -= count;
+			}
+		}
 	}
 
 	private boolean insertIntoSlots(AbstractContainerMenu menu, List<Integer> targetSlots, ItemStack stack, Set<Integer> changedSlotIndexes) {

@@ -1,8 +1,8 @@
 package net.p3pp3rf1y.sophisticatedinventoryinteractions.client;
 
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -152,15 +152,16 @@ public class ScreenInteractionInjector {
 
 	private void updateNoResultsBackgroundColor(InjectedScreenState state) {
 		if (!state.noResultsLabel.isVisibleLabel()) {
-			state.noResultsSampledBackgroundColor = null;
+			state.hasNoResultsSampledBackgroundColor = false;
 			return;
 		}
 
-		if (state.noResultsSampledBackgroundColor == null) {
+		if (!state.hasNoResultsSampledBackgroundColor) {
 			SlotPosition topLeftSlotPosition = state.containerTopLeftSlotPosition;
 			int sampleGuiX = state.screen.getGuiLeft() + topLeftSlotPosition.x() - 3;
 			int sampleGuiY = state.screen.getGuiTop() + topLeftSlotPosition.y();
 			state.noResultsSampledBackgroundColor = samplePixelColor(sampleGuiX, sampleGuiY);
+			state.hasNoResultsSampledBackgroundColor = true;
 		}
 		state.noResultsLabel.setBackgroundColor(state.noResultsSampledBackgroundColor);
 	}
@@ -180,10 +181,8 @@ public class ScreenInteractionInjector {
 		int fbYTop = (int) Math.floor((double) clampedGuiY * window.getScreenHeight() / scaledHeight);
 		int fbY = Math.max(0, Math.min(window.getScreenHeight() - 1, window.getScreenHeight() - 1 - fbYTop));
 
-		// GlStateManager readback is used only as a fallback because higher-level APIs do not expose a single-pixel GUI sample in this context.
-		// Keep this cached-per-visible-state to avoid per-frame GPU stalls.
 		PIXEL_SAMPLE_BUFFER.clear();
-		GlStateManager._readPixels(fbX, fbY, 1, 1, 6408, 5121, PIXEL_SAMPLE_BUFFER);
+		RenderSystem.readPixels(fbX, fbY, 1, 1, 6408, 5121, PIXEL_SAMPLE_BUFFER);
 		int r = PIXEL_SAMPLE_BUFFER.get(0) & 0xFF;
 		int g = PIXEL_SAMPLE_BUFFER.get(1) & 0xFF;
 		int b = PIXEL_SAMPLE_BUFFER.get(2) & 0xFF;
@@ -219,11 +218,10 @@ public class ScreenInteractionInjector {
 			Slot slot = state.screen.getMenu().getSlot(slotIndex);
 			if (slot.hasItem() && SearchPhraseMatcher.matches(Minecraft.getInstance(), slot.getItem(), phrase)) {
 				SlotPosition targetPosition = state.containerVisiblePositions.get(nextVisiblePosition);
-				slot.x = targetPosition.x();
-				slot.y = targetPosition.y();
+				setSlotPositionIfDifferent(slot, targetPosition.x(), targetPosition.y());
 				nextVisiblePosition++;
 				visibleSlots++;
-			} else {
+			} else if (slot.x != DISABLED_SLOT_X_POS) {
 				slot.x = DISABLED_SLOT_X_POS;
 			}
 		}
@@ -237,8 +235,16 @@ public class ScreenInteractionInjector {
 				continue;
 			}
 			Slot slot = state.screen.getMenu().getSlot(slotIndex);
-			slot.x = originalPosition.x();
-			slot.y = originalPosition.y();
+			setSlotPositionIfDifferent(slot, originalPosition.x(), originalPosition.y());
+		}
+	}
+
+	private void setSlotPositionIfDifferent(Slot slot, int x, int y) {
+		if (slot.x != x) {
+			slot.x = x;
+		}
+		if (slot.y != y) {
+			slot.y = y;
 		}
 	}
 
@@ -372,9 +378,7 @@ public class ScreenInteractionInjector {
 		if (!isRememberSearchPhraseEnabled()) {
 			return;
 		}
-		if (!(storageScreen.getMenu() instanceof StorageContainerMenuBase<?> storageMenu)) {
-			return;
-		}
+		StorageContainerMenuBase<?> storageMenu = storageScreen.getMenu();
 		if (!storageMenu.shouldKeepSearchPhrase()) {
 			return;
 		}
@@ -389,9 +393,7 @@ public class ScreenInteractionInjector {
 		if (!isRememberSearchPhraseEnabled()) {
 			return;
 		}
-		if (!(storageScreen.getMenu() instanceof StorageContainerMenuBase<?> storageMenu)) {
-			return;
-		}
+		StorageContainerMenuBase<?> storageMenu = storageScreen.getMenu();
 		if (!storageMenu.shouldKeepSearchPhrase()) {
 			return;
 		}
@@ -486,7 +488,8 @@ public class ScreenInteractionInjector {
 		private final Button transferToPlayerButton;
 		private final Button transferToContainerButton;
 		private final Button sortPlayerButton;
-		private Integer noResultsSampledBackgroundColor = null;
+		private int noResultsSampledBackgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
+		private boolean hasNoResultsSampledBackgroundColor = false;
 		private String searchPhrase = "";
 
 		private InjectedScreenState(AbstractContainerScreen<?> screen, List<Integer> filteredContainerSlotIndexes,
@@ -542,6 +545,16 @@ public class ScreenInteractionInjector {
 
 		private boolean isVisibleLabel() {
 			return visible;
+		}
+
+		@Override
+		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			return false;
+		}
+
+		@Override
+		public boolean isMouseOver(double mouseX, double mouseY) {
+			return false;
 		}
 
 		@Override
