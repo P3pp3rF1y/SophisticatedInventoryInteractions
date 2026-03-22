@@ -1,0 +1,8 @@
+{
+  "key.category.sophisticatedinventoryinteractions.main": "精妙物品栏操作（Sophisticated Inventory Interactions）",
+  "gui.sophisticatedinventoryinteractions.search_hint": "搜索",
+  "gui.sophisticatedinventoryinteractions.sort_container": "整理容器物品栏",
+  "gui.sophisticatedinventoryinteractions.sort_player": "整理玩家物品栏",
+  "gui.sophisticatedinventoryinteractions.transfer_to_container": "转移至容器物品栏",
+  "gui.sophisticatedinventoryinteractions.transfer_to_player": "转移至玩家物品栏"
+}
