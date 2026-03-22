@@ -19,6 +19,7 @@ import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.*;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.Dimension;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiHelper;
+import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiSoundHelper;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.Position;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.TranslationHelper;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
@@ -262,7 +263,8 @@ public class ScreenInteractionInjector {
 		if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
 			return;
 		}
-		if (tryHandleSortKeybind(event.getScreen(), InputConstants.Type.MOUSE.getOrCreate(event.getButton()))) {
+		if (tryHandleSortKeybind(event.getScreen(), InputConstants.Type.MOUSE.getOrCreate(event.getButton()))
+				|| tryHandleTransferKeybind(event.getScreen(), InputConstants.Type.MOUSE.getOrCreate(event.getButton()))) {
 			event.setCanceled(true);
 			return;
 		}
@@ -295,9 +297,31 @@ public class ScreenInteractionInjector {
 
 	public void onKeyPressed(ScreenEvent.KeyPressed.Pre event) {
 		InputConstants.Key key = InputConstants.getKey(event.getKeyEvent());
-		if (tryHandleSortKeybind(event.getScreen(), key)) {
+		if (tryHandleSortKeybind(event.getScreen(), key) || tryHandleTransferKeybind(event.getScreen(), key)) {
 			event.setCanceled(true);
 		}
+	}
+
+	private boolean tryHandleTransferKeybind(Screen screen, InputConstants.Key inputKey) {
+		if (!(screen instanceof AbstractContainerScreen<?>)) {
+			return false;
+		}
+		if (screen instanceof StorageScreenBase<?>) {
+			return false;
+		}
+
+		InteractionActionType actionType;
+		if (matchesTransferToStorageKeybind(inputKey)) {
+			actionType = InteractionActionType.TRANSFER_TO_CONTAINER;
+		} else if (matchesTransferToInventoryKeybind(inputKey)) {
+			actionType = InteractionActionType.TRANSFER_TO_PLAYER;
+		} else {
+			return false;
+		}
+
+		ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, !Minecraft.getInstance().hasShiftDown(), SortBy.NAME));
+		GuiSoundHelper.playButtonClickSound();
+		return true;
 	}
 
 	private boolean tryHandleSortKeybind(Screen screen, InputConstants.Key inputKey) {
@@ -311,11 +335,13 @@ public class ScreenInteractionInjector {
 		Slot slotUnderMouse = getHoveredSlot(containerScreen);
 		if (slotUnderMouse != null && isPlayerInventorySlot(slotUnderMouse)) {
 			ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
+			GuiSoundHelper.playButtonClickSound();
 			return true;
 		}
 
 		if (isPlayerOnlyMenu(containerScreen)) {
 			ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
+			GuiSoundHelper.playButtonClickSound();
 			return true;
 		}
 
@@ -324,6 +350,7 @@ public class ScreenInteractionInjector {
 		}
 
 		ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_CONTAINER, true, SortBy.NAME));
+		GuiSoundHelper.playButtonClickSound();
 		return true;
 	}
 
@@ -338,7 +365,19 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean matchesSortKeybind(InputConstants.Key inputKey) {
-		return net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND.isActiveAndMatches(inputKey);
+		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND, inputKey);
+	}
+
+	private boolean matchesTransferToStorageKeybind(InputConstants.Key inputKey) {
+		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_STORAGE_KEYBIND, inputKey);
+	}
+
+	private boolean matchesTransferToInventoryKeybind(InputConstants.Key inputKey) {
+		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_INVENTORY_KEYBIND, inputKey);
+	}
+
+	private boolean matchesKeybind(net.minecraft.client.KeyMapping keyMapping, InputConstants.Key inputKey) {
+		return !keyMapping.isUnbound() && keyMapping.getKey().equals(inputKey);
 	}
 
 	private boolean isPlayerInventorySlot(Slot slot) {
