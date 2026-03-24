@@ -15,10 +15,10 @@ import java.util.stream.Collectors;
 public class ContainerActionExecutor {
 	public boolean execute(ServerPlayer player, AbstractContainerMenu menu, SlotRegions regions, InteractionActionType action, boolean filterByContents, SortBy sortBy) {
 		boolean changed = switch (action) {
-			case SORT_CONTAINER -> sortRegion(player, menu, regions.containerSlotIndexes(), sortBy);
+			case SORT_CONTAINER -> sortRegion(player, menu, regions.actionableContainerSlotIndexes(), sortBy);
 			case SORT_PLAYER -> sortRegion(player, menu, regions.playerMainSlotIndexes(), SortBy.NAME);
-			case TRANSFER_TO_CONTAINER -> transferBetweenRegions(player, menu, regions.playerMainSlotIndexes(), regions.containerSlotIndexes(), filterByContents);
-			case TRANSFER_TO_PLAYER -> transferBetweenRegions(player, menu, regions.containerSlotIndexes(), regions.playerSlotIndexes(), filterByContents);
+			case TRANSFER_TO_CONTAINER -> transferBetweenRegions(player, menu, regions.playerMainSlotIndexes(), regions.actionableContainerSlotIndexes(), filterByContents);
+			case TRANSFER_TO_PLAYER -> transferBetweenRegions(player, menu, regions.actionableContainerSlotIndexes(), regions.playerSlotIndexes(), filterByContents);
 		};
 
 		if (changed) {

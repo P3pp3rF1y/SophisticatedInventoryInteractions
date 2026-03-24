@@ -18,10 +18,15 @@ public class SlotRegionClassifier {
 			.thenComparingInt(slot -> slot.x)
 			.thenComparingInt(slot -> slot.index);
 
+	private final MenuSlotExclusionResolver menuSlotExclusionResolver = new MenuSlotExclusionResolver();
+
 	public SlotRegions classify(AbstractContainerMenu menu) {
-		List<SlotWithId> containerSlots = new ArrayList<>();
+		List<SlotWithId> rawContainerSlots = new ArrayList<>();
+		List<SlotWithId> actionableContainerSlots = new ArrayList<>();
+		List<SlotWithId> excludedContainerSlots = new ArrayList<>();
 		List<SlotWithId> playerSlots = new ArrayList<>();
 		List<SlotWithId> playerMainSlots = new ArrayList<>();
+		var excludedSlotIds = menuSlotExclusionResolver.getExcludedSlotIds(menu.getClass().getName());
 
 		for (int slotId = 0; slotId < menu.slots.size(); slotId++) {
 			Slot slot = menu.slots.get(slotId);
@@ -33,19 +38,28 @@ public class SlotRegionClassifier {
 					playerMainSlots.add(slotWithId);
 				}
 			} else {
-				containerSlots.add(slotWithId);
+				rawContainerSlots.add(slotWithId);
+				if (excludedSlotIds.contains(slotId)) {
+					excludedContainerSlots.add(slotWithId);
+				} else {
+					actionableContainerSlots.add(slotWithId);
+				}
 			}
 		}
 
-		containerSlots.sort(Comparator.comparing(SlotWithId::slot, SLOT_ORDER));
+		rawContainerSlots.sort(Comparator.comparing(SlotWithId::slot, SLOT_ORDER));
+		actionableContainerSlots.sort(Comparator.comparing(SlotWithId::slot, SLOT_ORDER));
+		excludedContainerSlots.sort(Comparator.comparing(SlotWithId::slot, SLOT_ORDER));
 		playerSlots.sort(Comparator.comparing(SlotWithId::slot, SLOT_ORDER));
 		playerMainSlots.sort(Comparator.comparing(SlotWithId::slot, SLOT_ORDER));
 
 		return new SlotRegions(
-				containerSlots.stream().map(SlotWithId::slotId).toList(),
+				rawContainerSlots.stream().map(SlotWithId::slotId).toList(),
+				actionableContainerSlots.stream().map(SlotWithId::slotId).toList(),
+				excludedContainerSlots.stream().map(SlotWithId::slotId).toList(),
 				playerSlots.stream().map(SlotWithId::slotId).toList(),
 				playerMainSlots.stream().map(SlotWithId::slotId).toList(),
-				containerSlots.stream().map(SlotWithId::slot).min(TOP_RIGHT_SLOT_COMPARATOR).orElse(null),
+				actionableContainerSlots.stream().map(SlotWithId::slot).min(TOP_RIGHT_SLOT_COMPARATOR).orElse(null),
 				playerSlots.stream().map(SlotWithId::slot).min(TOP_RIGHT_SLOT_COMPARATOR).orElse(null)
 		);
 	}
