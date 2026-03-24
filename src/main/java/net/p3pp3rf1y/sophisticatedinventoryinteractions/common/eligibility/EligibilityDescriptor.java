@@ -5,6 +5,7 @@ import javax.annotation.Nullable;
 public record EligibilityDescriptor(
 		@Nullable String screenClassName,
 		String menuClassName,
+		int actionableContainerSlotCount,
 		boolean hasContainerRegion,
 		boolean hasPlayerRegion,
 		boolean hasContainerAnchor,

@@ -31,6 +31,7 @@ public class ActionValidationService {
 		EligibilityDescriptor descriptor = new EligibilityDescriptor(
 				null,
 				menu.getClass().getName(),
+				regions.actionableContainerSlotCount(),
 				regions.hasContainerRegion(),
 				regions.hasPlayerRegion(),
 				regions.containerAnchor() != null,
