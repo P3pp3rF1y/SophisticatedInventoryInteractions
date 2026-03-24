@@ -6,17 +6,23 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 public record SlotRegions(
-		List<Integer> containerSlotIndexes,
+		List<Integer> rawContainerSlotIndexes,
+		List<Integer> actionableContainerSlotIndexes,
+		List<Integer> excludedContainerSlotIndexes,
 		List<Integer> playerSlotIndexes,
 		List<Integer> playerMainSlotIndexes,
 		@Nullable Slot containerAnchor,
 		@Nullable Slot playerAnchor
 ) {
 	public boolean hasContainerRegion() {
-		return !containerSlotIndexes.isEmpty();
+		return !actionableContainerSlotIndexes.isEmpty();
 	}
 
 	public boolean hasPlayerRegion() {
 		return !playerSlotIndexes.isEmpty();
+	}
+
+	public int actionableContainerSlotCount() {
+		return actionableContainerSlotIndexes.size();
 	}
 }
