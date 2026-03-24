@@ -27,6 +27,7 @@ public class ScreenContextResolver {
 		EligibilityDescriptor descriptor = new EligibilityDescriptor(
 				screenClassName,
 				menuClassName,
+				regions.actionableContainerSlotCount(),
 				regions.hasContainerRegion(),
 				regions.hasPlayerRegion(),
 				regions.containerAnchor() != null,
