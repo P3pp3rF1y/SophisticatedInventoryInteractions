@@ -5,7 +5,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -14,8 +14,8 @@ import net.minecraft.util.ARGB;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
-import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.*;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.Dimension;
@@ -144,7 +144,7 @@ public class ScreenInteractionInjector {
 		if (screen instanceof StorageScreenBase<?> storageScreen) {
 			SophisticatedScreenState sophisticatedState = sophisticatedStates.get(storageScreen);
 			if (sophisticatedState != null) {
-				sophisticatedState.sortPlayerButton.renderTooltip(storageScreen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+				sophisticatedState.sortPlayerButton.extractTooltip(storageScreen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
 			}
 			syncSharedSearchFromStorageScreen(storageScreen);
 			return;
@@ -153,7 +153,7 @@ public class ScreenInteractionInjector {
 		InjectedScreenState state = states.get(screen);
 		PlayerOnlyScreenState playerOnlyState = playerOnlyStates.get(screen);
 		if (playerOnlyState != null) {
-			playerOnlyState.sortPlayerButton.renderTooltip(screen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+			playerOnlyState.sortPlayerButton.extractTooltip(screen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
 		}
 		if (state == null) {
 			return;
@@ -161,7 +161,12 @@ public class ScreenInteractionInjector {
 
 		applySearchFilter(state);
 		updateNoResultsBackgroundColor(state);
-		state.searchBox.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		if (state.searchBox != null) {
+			state.searchBox.extractRenderState(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		}
+		if (state.noResultsLabel != null) {
+			state.noResultsLabel.extractRenderState(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		}
 		renderTooltips(event, state);
 	}
 
@@ -205,32 +210,35 @@ public class ScreenInteractionInjector {
 	}
 
 	private int decodeArgb(ByteBuffer data, int pixelOffset) {
-		int r = data.get(pixelOffset) & 0xFF;
-		int g = data.get(pixelOffset + 1) & 0xFF;
-		int b = data.get(pixelOffset + 2) & 0xFF;
-		return 0xFF000000 | (r << 16) | (g << 8) | b;
+		int red = Byte.toUnsignedInt(data.get(pixelOffset));
+		int green = Byte.toUnsignedInt(data.get(pixelOffset + 1));
+		int blue = Byte.toUnsignedInt(data.get(pixelOffset + 2));
+		int alpha = Byte.toUnsignedInt(data.get(pixelOffset + 3));
+		return alpha << 24 | red << 16 | green << 8 | blue;
 	}
 
 	private void readPixelToSampleBuffer(int fbX, int fbY) {
 		PIXEL_SAMPLE_BUFFER.clear();
 		GlStateManager._readPixels(fbX, fbY, 1, 1, 6408, 5121, MemoryUtil.memAddress(PIXEL_SAMPLE_BUFFER));
-		cachedSampledPixelColor = decodeArgb(PIXEL_SAMPLE_BUFFER, 0);
+		if (PIXEL_SAMPLE_BUFFER.capacity() >= 4) {
+			cachedSampledPixelColor = decodeArgb(PIXEL_SAMPLE_BUFFER, 0);
+		}
 	}
 
 	private void renderTooltips(ScreenEvent.Render.Post event, InjectedScreenState state) {
 		int mouseX = event.getMouseX();
 		int mouseY = event.getMouseY();
-		GuiGraphics guiGraphics = event.getGuiGraphics();
+		GuiGraphicsExtractor guiGraphics = event.getGuiGraphics();
 		if (state.searchBox != null) {
-			state.searchBox.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+			state.searchBox.extractTooltip(state.screen, guiGraphics, mouseX, mouseY);
 		}
-		state.sortContainerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		state.sortContainerButton.extractTooltip(state.screen, guiGraphics, mouseX, mouseY);
 		if (state.sortByButton != null) {
-			state.sortByButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+			state.sortByButton.extractTooltip(state.screen, guiGraphics, mouseX, mouseY);
 		}
-		state.transferToPlayerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
-		state.transferToContainerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
-		state.sortPlayerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		state.transferToPlayerButton.extractTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		state.transferToContainerButton.extractTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		state.sortPlayerButton.extractTooltip(state.screen, guiGraphics, mouseX, mouseY);
 	}
 
 	private void applySearchFilter(InjectedScreenState state) {
@@ -388,7 +396,7 @@ public class ScreenInteractionInjector {
 			Minecraft mc = Minecraft.getInstance();
 			double mouseX = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
 			double mouseY = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
-			return storageScreen.getHoveredSlot(mouseX, mouseY);
+			return storageScreen.findSlot(mouseX, mouseY);
 		}
 		return screen.getSlotUnderMouse();
 	}
@@ -540,7 +548,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private Button buildSortButton(int x, int y, InteractionActionType actionType, SortByState sortByState) {
-		Button button = new ImmediateTooltipButton(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
+		Button button = new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
 			if (mouseButton == 0) {
 				ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, true, sortByState.getSortBy()));
 			}
@@ -557,7 +565,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private Button buildPlayerSortButton(int x, int y) {
-		return new ImmediateTooltipButton(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
+		return new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
 			if (mouseButton == 0) {
 				ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 			}
@@ -641,7 +649,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private static class NoResultsLabel extends WidgetBase {
-		private static final int TEXT_COLOR = 4210752;
+		private static final int TEXT_COLOR = ARGB.opaque(4210752);
 		private static final int LINE_HEIGHT = 9;
 		private int backgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
 		private final List<net.minecraft.util.FormattedCharSequence> lines;
@@ -671,14 +679,14 @@ public class ScreenInteractionInjector {
 		}
 
 		@Override
-		protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+		protected void extractWidget(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
 			for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-				guiGraphics.drawString(minecraft.font, lines.get(lineIndex), x, y + lineIndex * LINE_HEIGHT, TEXT_COLOR, false);
+				guiGraphics.text(minecraft.font, lines.get(lineIndex), x, y + lineIndex * LINE_HEIGHT, TEXT_COLOR, false);
 			}
 		}
 
 		@Override
-		protected void renderBg(GuiGraphics guiGraphics, Minecraft minecraft, int mouseX, int mouseY) {
+		protected void extractBg(GuiGraphicsExtractor guiGraphics, Minecraft minecraft, int mouseX, int mouseY) {
 			guiGraphics.fill(x - 2, y - 1, x + getWidth() + 2, y + getHeight() + 1, backgroundColor);
 		}
 
@@ -706,7 +714,7 @@ public class ScreenInteractionInjector {
 		}
 
 		@Override
-		protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+		protected void extractWidget(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
 			if (Minecraft.getInstance().hasShiftDown()) {
 				net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiHelper.blit(guiGraphics, x, y, allDefinition.getForegroundTexture());
 			} else {
@@ -717,26 +725,6 @@ public class ScreenInteractionInjector {
 		@Override
 		protected List<Component> getTooltip() {
 			return Minecraft.getInstance().hasShiftDown() ? allDefinition.getTooltip() : filteredDefinition.getTooltip();
-		}
-
-		@Override
-		public void renderTooltip(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY) {
-			if (visible && isMouseOver(mouseX, mouseY)) {
-				GuiHelper.renderTooltip(screen, guiGraphics, getTooltip(), mouseX, mouseY);
-			}
-		}
-	}
-
-	private static class ImmediateTooltipButton extends Button {
-		private ImmediateTooltipButton(Position position, ButtonDefinition buttonDefinition, java.util.function.IntConsumer onClick) {
-			super(position, buttonDefinition, onClick);
-		}
-
-		@Override
-		public void renderTooltip(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY) {
-			if (visible && isMouseOver(mouseX, mouseY)) {
-				GuiHelper.renderTooltip(screen, guiGraphics, getTooltip(), mouseX, mouseY);
-			}
 		}
 	}
 
@@ -785,7 +773,7 @@ public class ScreenInteractionInjector {
 		}
 
 		@Override
-		protected void renderBg(GuiGraphics guiGraphics, Minecraft minecraft, int mouseX, int mouseY) {
+		protected void extractBg(GuiGraphicsExtractor guiGraphics, Minecraft minecraft, int mouseX, int mouseY) {
 			int minWidth = getHeight();
 			if ((isFocused() && maximizedWidth > getWidth()) || (!isFocused() && getValue().isEmpty() && getWidth() > minWidth)) {
 				float ratio = Easing.EASE_IN_OUT_CUBIC.ease(Math.min((System.currentTimeMillis() - lastFocusChangeTime) / 200f, 1));
@@ -798,9 +786,9 @@ public class ScreenInteractionInjector {
 		}
 
 		@Override
-		public void renderTooltip(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY) {
+		public void extractTooltip(Screen screen, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
 			if (!isFocused() && isMouseOver(mouseX, mouseY)) {
-				GuiHelper.renderTooltip(screen, guiGraphics, List.of(
+				GuiHelper.extractTooltip(screen, guiGraphics, List.of(
 						Component.translatable("gui.sophisticatedcore.text_box.search_box"),
 						Component.translatable("gui.sophisticatedcore.text_box.search_box_detail").withStyle(ChatFormatting.GRAY)
 				), mouseX, mouseY);

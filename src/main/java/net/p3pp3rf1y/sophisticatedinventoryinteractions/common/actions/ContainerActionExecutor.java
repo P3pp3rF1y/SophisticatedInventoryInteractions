@@ -275,8 +275,8 @@ public class ContainerActionExecutor {
 					.reversed()
 					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
 			case TAGS -> Comparator
-					.comparingInt((ItemStack stack) -> -stack.getTags().collect(Collectors.toSet()).size())
-					.thenComparing(stack -> stack.getTags().map(tag -> tag.location().toString()).sorted().collect(Collectors.joining("|")))
+					.comparingInt((ItemStack stack) -> -stack.getItem().builtInRegistryHolder().tags().collect(Collectors.toSet()).size())
+					.thenComparing(stack -> stack.getItem().builtInRegistryHolder().tags().map(tag -> tag.location().toString()).sorted().collect(Collectors.joining("|")))
 					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
 			case NAME -> Comparator
 					.comparing((ItemStack stack) -> stack.getHoverName().getString().toLowerCase())
