@@ -28,8 +28,8 @@ public class SlotRegionClassifier {
 		List<SlotWithId> playerMainSlots = new ArrayList<>();
 		var excludedSlotIds = menuSlotExclusionResolver.getExcludedSlotIds(menu.getClass().getName());
 
-		for (int slotId = 0; slotId < menu.slots.size(); slotId++) {
-			Slot slot = menu.slots.get(slotId);
+		for (Slot slot : menu.slots) {
+			int slotId = slot.index;
 			SlotWithId slotWithId = new SlotWithId(slotId, slot);
 			if (slot.container instanceof Inventory) {
 				playerSlots.add(slotWithId);
