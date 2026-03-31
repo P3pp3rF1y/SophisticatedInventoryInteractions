@@ -162,10 +162,10 @@ public class ScreenInteractionInjector {
 		applySearchFilter(state);
 		updateNoResultsBackgroundColor(state);
 		if (state.searchBox != null) {
-			state.searchBox.extractRenderState(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+			state.searchBox.extractRenderStateInLatePass(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
 		}
 		if (state.noResultsLabel != null) {
-			state.noResultsLabel.extractRenderState(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+			state.noResultsLabel.extractRenderStateInLatePass(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
 		}
 		renderTooltips(event, state);
 	}
@@ -524,11 +524,13 @@ public class ScreenInteractionInjector {
 		@Nullable NoResultsLabel noResultsLabel = null;
 		if (layout.searchLayout() != null) {
 			searchBox = new InteractionSearchBox(new Position(layout.searchLayout().x(), layout.searchLayout().y()), new Dimension(layout.searchLayout().width(), layout.searchLayout().height()));
+			searchBox.setRenderInDefaultPass(false);
 			noResultsLabel = new NoResultsLabel(
 					new Position(layout.searchLayout().x(), layout.searchLayout().y() + 13),
 					containerVisibleWidth,
 					Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results"))
 			);
+			noResultsLabel.setRenderInDefaultPass(false);
 			noResultsLabel.setVisible(false);
 		}
 		SortByState sortByState = new SortByState();
