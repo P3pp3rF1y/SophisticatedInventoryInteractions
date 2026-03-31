@@ -10,6 +10,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.ARGB;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
@@ -160,6 +161,12 @@ public class ScreenInteractionInjector {
 
 		applySearchFilter(state);
 		updateNoResultsBackgroundColor(state);
+		if (state.searchBox != null) {
+			state.searchBox.renderInLatePass(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		}
+		if (state.noResultsLabel != null) {
+			state.noResultsLabel.renderInLatePass(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		}
 		renderTooltips(event, state);
 	}
 
@@ -511,11 +518,13 @@ public class ScreenInteractionInjector {
 		@Nullable NoResultsLabel noResultsLabel = null;
 		if (layout.searchLayout() != null) {
 			searchBox = new InteractionSearchBox(new Position(layout.searchLayout().x(), layout.searchLayout().y()), new Dimension(layout.searchLayout().width(), layout.searchLayout().height()));
+			searchBox.setRenderInDefaultPass(false);
 			noResultsLabel = new NoResultsLabel(
 					new Position(layout.searchLayout().x(), layout.searchLayout().y() + 13),
 					containerVisibleWidth,
 					Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results"))
 			);
+			noResultsLabel.setRenderInDefaultPass(false);
 			noResultsLabel.setVisible(false);
 		}
 		SortByState sortByState = new SortByState();
@@ -636,7 +645,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private static class NoResultsLabel extends WidgetBase {
-		private static final int TEXT_COLOR = 4210752;
+		private static final int TEXT_COLOR = ARGB.opaque(4210752);
 		private static final int LINE_HEIGHT = 9;
 		private int backgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
 		private final List<net.minecraft.util.FormattedCharSequence> lines;
@@ -737,7 +746,7 @@ public class ScreenInteractionInjector {
 
 	private static class InteractionSearchBox extends TextBox {
 		private static final String MAGNIFYING_GLASS = "\uD83D\uDD0D";
-		private static final int UNFOCUSED_COLOR = 0xBBBBBB;
+		private static final int UNFOCUSED_COLOR = ARGB.opaque(0xBBBBBB);
 		private long lastFocusChangeTime = 0;
 		private final int maximizedX;
 		private final int maximizedWidth;
