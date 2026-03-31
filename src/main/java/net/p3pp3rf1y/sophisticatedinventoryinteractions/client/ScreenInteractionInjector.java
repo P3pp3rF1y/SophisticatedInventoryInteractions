@@ -161,7 +161,12 @@ public class ScreenInteractionInjector {
 
 		applySearchFilter(state);
 		updateNoResultsBackgroundColor(state);
-		state.searchBox.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		if (state.searchBox != null) {
+			state.searchBox.renderInLatePass(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		}
+		if (state.noResultsLabel != null) {
+			state.noResultsLabel.renderInLatePass(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), 0);
+		}
 		renderTooltips(event, state);
 	}
 
@@ -516,11 +521,13 @@ public class ScreenInteractionInjector {
 		@Nullable NoResultsLabel noResultsLabel = null;
 		if (layout.searchLayout() != null) {
 			searchBox = new InteractionSearchBox(new Position(layout.searchLayout().x(), layout.searchLayout().y()), new Dimension(layout.searchLayout().width(), layout.searchLayout().height()));
+			searchBox.setRenderInDefaultPass(false);
 			noResultsLabel = new NoResultsLabel(
 					new Position(layout.searchLayout().x(), layout.searchLayout().y() + 13),
 					containerVisibleWidth,
 					Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results"))
 			);
+			noResultsLabel.setRenderInDefaultPass(false);
 			noResultsLabel.setVisible(false);
 		}
 		SortByState sortByState = new SortByState();
@@ -641,7 +648,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private static class NoResultsLabel extends WidgetBase {
-		private static final int TEXT_COLOR = 4210752;
+		private static final int TEXT_COLOR = ARGB.opaque(4210752);
 		private static final int LINE_HEIGHT = 9;
 		private int backgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
 		private final List<net.minecraft.util.FormattedCharSequence> lines;
