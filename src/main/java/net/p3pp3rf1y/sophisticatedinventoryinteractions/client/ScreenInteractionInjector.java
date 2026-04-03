@@ -26,6 +26,7 @@ import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedcore.util.Easing;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.AnchorLayoutService;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions.InteractionActionType;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDecision;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.MenuEligibilityService;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.ContainerInteractionPayload;
@@ -318,10 +319,13 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean tryHandleTransferKeybind(Screen screen, InputConstants.Key inputKey) {
-		if (!(screen instanceof AbstractContainerScreen<?>)) {
+		if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
 			return false;
 		}
 		if (screen instanceof StorageScreenBase<?>) {
+			return false;
+		}
+		if (!isEligibleForInjectedInteractions(containerScreen)) {
 			return false;
 		}
 
@@ -346,15 +350,17 @@ public class ScreenInteractionInjector {
 		if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
 			return false;
 		}
-
-		Slot slotUnderMouse = getHoveredSlot(containerScreen);
-		if (slotUnderMouse != null && isPlayerInventorySlot(slotUnderMouse)) {
+		if (isPlayerOnlyMenu(containerScreen)) {
 			PacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 			GuiSoundHelper.playButtonClickSound();
 			return true;
 		}
+		if (!(screen instanceof StorageScreenBase<?>) && !isEligibleForInjectedInteractions(containerScreen)) {
+			return false;
+		}
 
-		if (isPlayerOnlyMenu(containerScreen)) {
+		Slot slotUnderMouse = getHoveredSlot(containerScreen);
+		if (slotUnderMouse != null && isPlayerInventorySlot(slotUnderMouse)) {
 			PacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 			GuiSoundHelper.playButtonClickSound();
 			return true;
@@ -405,6 +411,14 @@ public class ScreenInteractionInjector {
 
 	private boolean isPlayerOnlyMenu(AbstractContainerScreen<?> screen) {
 		return screen.getMenu() instanceof InventoryMenu;
+	}
+
+	private boolean isEligibleForInjectedInteractions(AbstractContainerScreen<?> screen) {
+		return contextResolver.resolve(screen)
+				.map(ScreenContextResolver.ResolvedScreenContext::eligibilityDescriptor)
+				.map(menuEligibilityService::evaluate)
+				.map(EligibilityDecision::eligible)
+				.orElse(false);
 	}
 
 	private void initPlayerOnlyScreen(ScreenEvent.Init.Post event, AbstractContainerScreen<?> screen, SlotRegions regions) {
