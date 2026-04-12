@@ -129,6 +129,9 @@ dependencies {
             transitive = false
         }
     }
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.+'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.+'
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
