@@ -116,6 +116,8 @@ dependencies {
     }
 
     minecraft "net.neoforged:forge:${minecraft_version}-${neo_version}"
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.+'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.+'
 }
 
 tasks.withType(ProcessResources).configureEach {
