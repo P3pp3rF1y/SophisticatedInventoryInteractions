@@ -1,16 +1,15 @@
 package net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
 import net.p3pp3rf1y.sophisticatedcore.inventory.ItemStackKey;
+import net.p3pp3rf1y.sophisticatedcore.util.InventorySorter;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class ContainerActionExecutor {
 	public boolean execute(ServerPlayer player, AbstractContainerMenu menu, SlotRegions regions, InteractionActionType action, boolean filterByContents, SortBy sortBy) {
@@ -64,12 +63,10 @@ public class ContainerActionExecutor {
 			return false;
 		}
 
-		mergeStacks(stacks);
+		List<Map.Entry<ItemStackKey, Integer>> sortedEntries = mergeAndSortStacks(stacks, sortBy);
 
-		stacks.sort(getComparator(sortBy));
-
-		for (ItemStack stack : stacks) {
-			if (!insertIntoSlots(menu, sortableSlotIndexes, stack, changedSlotIndexes)) {
+		for (Map.Entry<ItemStackKey, Integer> entry : sortedEntries) {
+			if (!insertIntoSlots(menu, sortableSlotIndexes, entry, changedSlotIndexes)) {
 				restoreSnapshot(menu, snapshot, changedSlotIndexes);
 				markSlotsChanged(menu, changedSlotIndexes);
 				return false;
@@ -181,73 +178,45 @@ public class ContainerActionExecutor {
 		return source.getCount() != originalCount;
 	}
 
-	private void mergeStacks(List<ItemStack> stacks) {
-		Map<ItemStackKey, ItemStack> stackTemplates = new LinkedHashMap<>();
+	List<Map.Entry<ItemStackKey, Integer>> mergeAndSortStacks(List<ItemStack> stacks, SortBy sortBy) {
 		Map<ItemStackKey, Integer> countsByType = new LinkedHashMap<>();
 
 		for (ItemStack stack : stacks) {
-			ItemStackKey key = toItemStackKey(stack);
-			stackTemplates.putIfAbsent(key, stack.copy());
-			countsByType.merge(key, stack.getCount(), Integer::sum);
+			countsByType.merge(toItemStackKey(stack), stack.getCount(), Integer::sum);
 		}
 
-		stacks.clear();
-		for (Map.Entry<ItemStackKey, Integer> entry : countsByType.entrySet()) {
-			ItemStack template = stackTemplates.get(entry.getKey());
-			int remaining = entry.getValue();
-			int maxStackSize = template.getMaxStackSize();
-			while (remaining > 0) {
-				ItemStack mergedStack = template.copy();
-				int count = Math.min(remaining, maxStackSize);
-				mergedStack.setCount(count);
-				stacks.add(mergedStack);
-				remaining -= count;
-			}
-		}
+		List<Map.Entry<ItemStackKey, Integer>> entries = new ArrayList<>(countsByType.entrySet());
+		entries.sort(getComparator(sortBy));
+		return entries;
 	}
 
-	private boolean insertIntoSlots(AbstractContainerMenu menu, List<Integer> targetSlots, ItemStack stack, Set<Integer> changedSlotIndexes) {
+	private boolean insertIntoSlots(AbstractContainerMenu menu, List<Integer> targetSlots, Map.Entry<ItemStackKey, Integer> entry, Set<Integer> changedSlotIndexes) {
+		int remaining = entry.getValue();
+		ItemStack template = entry.getKey().stack();
+
 		for (int targetIndex : targetSlots) {
-			if (stack.isEmpty()) {
+			if (remaining <= 0) {
 				return true;
 			}
+
 			Slot slot = menu.getSlot(targetIndex);
-			ItemStack target = slot.getItem();
-			if (!target.isEmpty() || !slot.mayPlace(stack)) {
+			if (slot.hasItem() || !slot.mayPlace(template)) {
 				continue;
 			}
-			int toMove = Math.min(stack.getCount(), Math.min(slot.getMaxStackSize(stack), stack.getMaxStackSize()));
+
+			int toMove = Math.min(remaining, Math.min(slot.getMaxStackSize(template), template.getMaxStackSize()));
 			if (toMove <= 0) {
 				continue;
 			}
-			ItemStack moved = stack.copy();
+
+			ItemStack moved = template.copy();
 			moved.setCount(toMove);
 			slot.set(moved);
 			changedSlotIndexes.add(targetIndex);
-			stack.shrink(toMove);
+			remaining -= toMove;
 		}
 
-		for (int targetIndex : targetSlots) {
-			if (stack.isEmpty()) {
-				return true;
-			}
-			Slot slot = menu.getSlot(targetIndex);
-			ItemStack target = slot.getItem();
-			if (target.isEmpty() || !slot.mayPlace(stack) || !ItemStack.isSameItemSameComponents(target, stack)) {
-				continue;
-			}
-			int maxCount = Math.min(slot.getMaxStackSize(target), target.getMaxStackSize());
-			if (target.getCount() >= maxCount) {
-				continue;
-			}
-
-			int toMove = Math.min(stack.getCount(), maxCount - target.getCount());
-			target.grow(toMove);
-			changedSlotIndexes.add(targetIndex);
-			stack.shrink(toMove);
-		}
-
-		return stack.isEmpty();
+		return remaining <= 0;
 	}
 
 	private void restoreSnapshot(AbstractContainerMenu menu, Map<Integer, ItemStack> snapshot, Set<Integer> changedSlotIndexes) {
@@ -264,24 +233,12 @@ public class ContainerActionExecutor {
 		}
 	}
 
-	private Comparator<ItemStack> getComparator(SortBy sortBy) {
+	private Comparator<Map.Entry<ItemStackKey, Integer>> getComparator(SortBy sortBy) {
 		return switch (sortBy) {
-			case MOD -> Comparator
-					.comparing((ItemStack stack) -> BuiltInRegistries.ITEM.getKey(stack.getItem()).getNamespace())
-					.thenComparing(stack -> stack.getHoverName().getString().toLowerCase())
-					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
-			case COUNT -> Comparator
-					.comparingInt(ItemStack::getCount)
-					.reversed()
-					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
-			case TAGS -> Comparator
-					.comparingInt((ItemStack stack) -> -stack.getItem().builtInRegistryHolder().tags().collect(Collectors.toSet()).size())
-					.thenComparing(stack -> stack.getItem().builtInRegistryHolder().tags().map(tag -> tag.location().toString()).sorted().collect(Collectors.joining("|")))
-					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
-			case NAME -> Comparator
-					.comparing((ItemStack stack) -> stack.getHoverName().getString().toLowerCase())
-					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).getNamespace())
-					.thenComparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+			case MOD -> InventorySorter.BY_MOD;
+			case COUNT -> InventorySorter.BY_COUNT;
+			case TAGS -> InventorySorter.BY_TAGS;
+			case NAME -> InventorySorter.BY_NAME;
 		};
 	}
 
