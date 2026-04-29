@@ -10,7 +10,7 @@ public class ModPayloads {
 	}
 
 	public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-		PayloadRegistrar registrar = event.registrar(SophisticatedInventoryInteractions.MOD_ID).versioned("1.0");
+		PayloadRegistrar registrar = event.registrar(SophisticatedInventoryInteractions.MOD_ID).versioned(SophisticatedInventoryInteractions.getNetworkProtocolVersion());
 		registrar.playToServer(ContainerInteractionPayload.TYPE, ContainerInteractionPayload.STREAM_CODEC, ContainerInteractionPayload::handlePayload);
 	}
 }
