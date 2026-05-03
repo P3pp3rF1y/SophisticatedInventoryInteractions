@@ -15,11 +15,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.*;
-import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.Dimension;
-import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiHelper;
-import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiSoundHelper;
-import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.Position;
-import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.TranslationHelper;
+import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.*;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedcore.util.Easing;
@@ -439,9 +435,10 @@ public class ScreenInteractionInjector {
 
 		int sortPlayerX = layout.get().playerSortX();
 		int sortPlayerY = layout.get().playerSortY();
+		storageScreen.setTransferButtonsShift(0);
 		Optional<Position> transferToInventoryPosition = storageScreen.getTransferToInventoryButtonPosition();
 		if (transferToInventoryPosition.isPresent()) {
-			storageScreen.shiftTransferButtons(-SOPHISTICATED_TRANSFER_SHIFT);
+			storageScreen.setTransferButtonsShift(-SOPHISTICATED_TRANSFER_SHIFT);
 			sortPlayerX = transferToInventoryPosition.get().x();
 			sortPlayerY = transferToInventoryPosition.get().y();
 		}
