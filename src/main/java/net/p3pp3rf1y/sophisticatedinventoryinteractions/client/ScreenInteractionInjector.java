@@ -6,6 +6,7 @@ import com.mojang.blaze3d.platform.Window;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -26,6 +27,8 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.MenuE
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.ContainerInteractionPayload;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.InventoryInteractionsPacketHandler;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.RequestSortMemoryPayload;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.SetSortMemoryPayload;
 
 import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
@@ -111,7 +114,19 @@ public class ScreenInteractionInjector {
 			event.addListener(state.noResultsLabel);
 		}
 		states.put(screen, state);
+		InventoryInteractionsPacketHandler.INSTANCE.sendToServer(new RequestSortMemoryPayload());
 		applySearchFilter(state);
+	}
+
+	public void applySortMemory(int containerId, SortBy sortBy) {
+		Screen currentScreen = Minecraft.getInstance().screen;
+		if (!(currentScreen instanceof AbstractContainerScreen<?> containerScreen) || containerScreen.getMenu().containerId != containerId) {
+			return;
+		}
+		InjectedScreenState state = states.get(containerScreen);
+		if (state != null) {
+			state.sortByState.setSortBy(sortBy);
+		}
 	}
 
 	public void onScreenClosing(ScreenEvent.Closing event) {
@@ -365,18 +380,13 @@ public class ScreenInteractionInjector {
 			return false;
 		}
 
-		InventoryInteractionsPacketHandler.INSTANCE.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_CONTAINER, true, SortBy.NAME));
+		InjectedScreenState state = states.get(containerScreen);
+		InventoryInteractionsPacketHandler.INSTANCE.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_CONTAINER, true, state == null ? SortBy.NAME : state.sortByState.getSortBy()));
 		GuiSoundHelper.playButtonClickSound();
 		return true;
 	}
 
 	private Slot getHoveredSlot(AbstractContainerScreen<?> screen) {
-		if (screen instanceof StorageScreenBase<?> storageScreen) {
-			Minecraft mc = Minecraft.getInstance();
-			double mouseX = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
-			double mouseY = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
-			return storageScreen.findSlot(mouseX, mouseY);
-		}
 		return screen.getSlotUnderMouse();
 	}
 
@@ -528,7 +538,7 @@ public class ScreenInteractionInjector {
 
 		InjectedScreenState state = new InjectedScreenState(screen, filteredContainerSlotIndexes, Set.copyOf(filteredContainerSlotIndexes), containerVisiblePositions,
 				containerTopLeftSlotPosition,
-				originalSlotPositions, searchBox, noResultsLabel, sortContainer, sortByButton, transferToPlayer, transferToContainer, sortPlayer);
+				originalSlotPositions, searchBox, noResultsLabel, sortContainer, sortByButton, transferToPlayer, transferToContainer, sortPlayer, sortByState);
 		if (searchBox != null) {
 			searchBox.setResponder(v -> applySearchFilter(state));
 		}
@@ -548,6 +558,7 @@ public class ScreenInteractionInjector {
 		return new ToggleButton<>(new Position(x, y), ButtonDefinitions.SORT_BY, mouseButton -> {
 			if (mouseButton == 0) {
 				sortByState.nextSortBy();
+				InventoryInteractionsPacketHandler.INSTANCE.sendToServer(new SetSortMemoryPayload(sortByState.getSortBy()));
 			}
 		}, sortByState::getSortBy);
 	}
@@ -583,6 +594,7 @@ public class ScreenInteractionInjector {
 		private final Button transferToPlayerButton;
 		private final Button transferToContainerButton;
 		private final Button sortPlayerButton;
+		private final SortByState sortByState;
 		private int noResultsSampledBackgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
 		private boolean hasNoResultsSampledBackgroundColor = false;
 		private String searchPhrase = "";
@@ -592,7 +604,7 @@ public class ScreenInteractionInjector {
 				SlotPosition containerTopLeftSlotPosition,
 				Map<Integer, SlotPosition> originalSlotPositions,
 				@Nullable InteractionSearchBox searchBox, @Nullable NoResultsLabel noResultsLabel, Button sortContainerButton, @Nullable ToggleButton<SortBy> sortByButton,
-				Button transferToPlayerButton, Button transferToContainerButton, Button sortPlayerButton) {
+				Button transferToPlayerButton, Button transferToContainerButton, Button sortPlayerButton, SortByState sortByState) {
 			this.screen = screen;
 			this.filteredContainerSlotIndexes = filteredContainerSlotIndexes;
 			this.filteredContainerSlotIndexesSet = filteredContainerSlotIndexesSet;
@@ -606,6 +618,7 @@ public class ScreenInteractionInjector {
 			this.transferToPlayerButton = transferToPlayerButton;
 			this.transferToContainerButton = transferToContainerButton;
 			this.sortPlayerButton = sortPlayerButton;
+			this.sortByState = sortByState;
 		}
 
 		private boolean hasSearchBox() {
@@ -626,6 +639,10 @@ public class ScreenInteractionInjector {
 
 		private void nextSortBy() {
 			sortBy = sortBy.next();
+		}
+
+		private void setSortBy(SortBy sortBy) {
+			this.sortBy = sortBy;
 		}
 	}
 
@@ -656,6 +673,15 @@ public class ScreenInteractionInjector {
 		}
 
 		@Override
+		public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+			if (!visible) {
+				return;
+			}
+			renderBg(guiGraphics, minecraft, mouseX, mouseY);
+			renderWidget(guiGraphics, mouseX, mouseY, partialTicks);
+		}
+
+		@Override
 		public boolean mouseClicked(double mouseX, double mouseY, int button) {
 			return false;
 		}
@@ -663,6 +689,20 @@ public class ScreenInteractionInjector {
 		@Override
 		public boolean isMouseOver(double mouseX, double mouseY) {
 			return false;
+		}
+
+		@Override
+		public void setFocused(boolean focused) {
+		}
+
+		@Override
+		public boolean isFocused() {
+			return false;
+		}
+
+		@Override
+		public NarratableEntry.NarrationPriority narrationPriority() {
+			return NarratableEntry.NarrationPriority.NONE;
 		}
 
 		@Override
@@ -748,15 +788,6 @@ public class ScreenInteractionInjector {
 				return true;
 			}
 			return super.mouseClicked(mouseX, mouseY, button);
-		}
-
-		@Override
-		public void setFocused(boolean focused) {
-			if (isFocused() != focused) {
-				lastFocusChangeTime = System.currentTimeMillis();
-			}
-			super.setFocused(focused);
-			setTextColor(focused ? -1 : UNFOCUSED_COLOR);
 		}
 
 		@Override

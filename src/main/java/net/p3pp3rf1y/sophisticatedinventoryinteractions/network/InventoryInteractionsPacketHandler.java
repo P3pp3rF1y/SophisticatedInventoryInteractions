@@ -13,5 +13,8 @@ public class InventoryInteractionsPacketHandler extends PacketHandler {
 	@Override
 	public void registerMessages() {
 		registerMessage(ContainerInteractionPayload.class, ContainerInteractionPayload::encode, ContainerInteractionPayload::decode, ContainerInteractionPayload::onMessage);
+		registerMessage(RequestSortMemoryPayload.class, RequestSortMemoryPayload::encode, RequestSortMemoryPayload::decode, RequestSortMemoryPayload::onMessage);
+		registerMessage(SetSortMemoryPayload.class, SetSortMemoryPayload::encode, SetSortMemoryPayload::decode, SetSortMemoryPayload::onMessage);
+		registerMessage(SyncSortMemoryPayload.class, SyncSortMemoryPayload::encode, SyncSortMemoryPayload::decode, SyncSortMemoryPayload::onMessage);
 	}
 }
