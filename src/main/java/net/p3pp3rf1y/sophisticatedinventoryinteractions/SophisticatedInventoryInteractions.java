@@ -18,8 +18,10 @@ import org.apache.logging.log4j.Logger;
 public class SophisticatedInventoryInteractions {
 	public static final String MOD_ID = "sophisticatedinventoryinteractions";
 	public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
+	private static String networkProtocolVersion;
 
 	public SophisticatedInventoryInteractions() {
+		networkProtocolVersion = ModLoadingContext.get().getActiveContainer().getModInfo().getVersion().toString();
 		IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 		ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC);
 		ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC);
@@ -35,5 +37,9 @@ public class SophisticatedInventoryInteractions {
 
 	public static ResourceLocation getRL(String path) {
 		return new ResourceLocation(MOD_ID, path);
+	}
+
+	public static String getNetworkProtocolVersion() {
+		return networkProtocolVersion;
 	}
 }

@@ -7,7 +7,7 @@ public class InventoryInteractionsPacketHandler extends PacketHandler {
 	public static final InventoryInteractionsPacketHandler INSTANCE = new InventoryInteractionsPacketHandler();
 
 	private InventoryInteractionsPacketHandler() {
-		super(SophisticatedInventoryInteractions.MOD_ID);
+		super(SophisticatedInventoryInteractions.MOD_ID, SophisticatedInventoryInteractions.getNetworkProtocolVersion());
 	}
 
 	@Override
