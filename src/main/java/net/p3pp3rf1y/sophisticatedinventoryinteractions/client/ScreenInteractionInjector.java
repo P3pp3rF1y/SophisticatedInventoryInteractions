@@ -122,7 +122,7 @@ public class ScreenInteractionInjector {
 	}
 
 	public void applySortMemory(int containerId, SortBy sortBy) {
-		Screen currentScreen = Minecraft.getInstance().screen;
+		Screen currentScreen = Minecraft.getInstance().gui.screen();
 		if (!(currentScreen instanceof AbstractContainerScreen<?> containerScreen) || containerScreen.getMenu().containerId != containerId) {
 			return;
 		}
