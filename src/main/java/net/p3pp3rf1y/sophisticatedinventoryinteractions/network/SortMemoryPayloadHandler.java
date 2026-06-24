@@ -19,7 +19,8 @@ public class SortMemoryPayloadHandler {
 
 	public static void handleRequest(ServerPlayer player) {
 		resolveCurrentStorageKey(player).ifPresent(storageKey -> InventoryInteractionSortMemory.get(player.serverLevel()).getSortBy(storageKey)
-				.ifPresent(sortBy -> InventoryInteractionsPacketHandler.INSTANCE.sendToClient(player, SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy))));
+				.ifPresent(sortBy -> InventoryInteractionsPacketHandler.INSTANCE.sendToClient(player,
+						SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy))));
 	}
 
 	public static void handleSet(ServerPlayer player, SortBy sortBy) {
@@ -31,11 +32,11 @@ public class SortMemoryPayloadHandler {
 
 	private static void syncOpenPlayers(ServerPlayer sourcePlayer, StorageSortKey changedStorageKey, SortBy sortBy) {
 		for (ServerPlayer player : sourcePlayer.getServer().getPlayerList().getPlayers()) {
-			resolveCurrentStorageKey(player)
-					.filter(changedStorageKey::equals)
-					.ifPresent(storageKey -> InventoryInteractionsPacketHandler.INSTANCE.sendToClient(player, sortBy == SortBy.NAME ?
-							SyncSortMemoryPayload.notSaved(player.containerMenu.containerId) :
-							SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy)));
+			resolveCurrentStorageKey(player).filter(changedStorageKey::equals)
+					.ifPresent(storageKey -> InventoryInteractionsPacketHandler.INSTANCE.sendToClient(player,
+							sortBy == SortBy.NAME
+									? SyncSortMemoryPayload.notSaved(player.containerMenu.containerId)
+									: SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy)));
 		}
 	}
 

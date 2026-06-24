@@ -24,8 +24,7 @@ public class Config {
 	}
 
 	public enum DefaultPolicy {
-		DENY_BY_DEFAULT,
-		ALLOW_BY_DEFAULT
+		DENY_BY_DEFAULT, ALLOW_BY_DEFAULT
 	}
 
 	public static class Common {
@@ -41,47 +40,37 @@ public class Config {
 
 		public Common(ForgeConfigSpec.Builder builder) {
 			builder.comment("Common settings").push("common");
-			defaultPolicy = builder.comment("Default eligibility policy when no force/include/exclude/safe-list rule matches")
-					.defineEnum("defaultPolicy", DefaultPolicy.DENY_BY_DEFAULT);
+			defaultPolicy = builder.comment("Default eligibility policy when no force/include/exclude/safe-list rule matches").defineEnum("defaultPolicy",
+					DefaultPolicy.DENY_BY_DEFAULT);
 			builder.comment("Menu class rules support exact class names and prefix matches using '*' suffix, e.g. net.minecraft.world.inventory.*");
 			forceIncludeMenuClasses = defineStringList(builder, "forceInclude.menuClasses", List.of());
 			excludeMenuClasses = defineStringList(builder, "exclude.menuClasses", List.of());
 			includeMenuClasses = defineStringList(builder, "include.menuClasses", List.of());
-			safeMenuClasses = defineStringList(builder, "safeList.menuClasses", List.of(
-					"net.minecraft.world.inventory.ChestMenu",
-					"net.minecraft.world.inventory.HopperMenu",
-					"net.minecraft.world.inventory.DispenserMenu",
-					"net.minecraft.world.inventory.ShulkerBoxMenu",
-					"net.minecraft.world.inventory.HorseInventoryMenu"
-			));
-			hideSearchAtOrBelowActionableContainerSlots = builder.comment(
-					"Hide the injected search box when the actionable container slot count is at or below this value.",
-					"Actionable container slots are non-player menu slots after configured slot exclusions are removed.",
-					"Examples with defaults: hopper (5) and dispenser/dropper (9) hide search, chest (27) keeps search."
-			).defineInRange("controls.search.hideAtOrBelowActionableContainerSlots", 9, 0, Integer.MAX_VALUE);
-			hideSortByAtOrBelowActionableContainerSlots = builder.comment(
-					"Hide the injected sort-by toggle when the actionable container slot count is at or below this value.",
-					"When sort-by is absent, the sort button shifts into the rightmost container-control position.",
-					"Examples with defaults: hopper (5) and dispenser/dropper (9) hide sort-by, chest (27) keeps it."
-			).defineInRange("controls.sortBy.hideAtOrBelowActionableContainerSlots", 9, 0, Integer.MAX_VALUE);
-			builder.comment(
-					"Menu slot exclusions use menuClass=slotId[,slotId|-range...] and support '*' suffix prefix rules.",
+			safeMenuClasses = defineStringList(builder, "safeList.menuClasses",
+					List.of("net.minecraft.world.inventory.ChestMenu", "net.minecraft.world.inventory.HopperMenu",
+							"net.minecraft.world.inventory.DispenserMenu", "net.minecraft.world.inventory.ShulkerBoxMenu",
+							"net.minecraft.world.inventory.HorseInventoryMenu"));
+			hideSearchAtOrBelowActionableContainerSlots = builder
+					.comment("Hide the injected search box when the actionable container slot count is at or below this value.",
+							"Actionable container slots are non-player menu slots after configured slot exclusions are removed.",
+							"Examples with defaults: hopper (5) and dispenser/dropper (9) hide search, chest (27) keeps search.")
+					.defineInRange("controls.search.hideAtOrBelowActionableContainerSlots", 9, 0, Integer.MAX_VALUE);
+			hideSortByAtOrBelowActionableContainerSlots = builder
+					.comment("Hide the injected sort-by toggle when the actionable container slot count is at or below this value.",
+							"When sort-by is absent, the sort button shifts into the rightmost container-control position.",
+							"Examples with defaults: hopper (5) and dispenser/dropper (9) hide sort-by, chest (27) keeps it.")
+					.defineInRange("controls.sortBy.hideAtOrBelowActionableContainerSlots", 9, 0, Integer.MAX_VALUE);
+			builder.comment("Menu slot exclusions use menuClass=slotId[,slotId|-range...] and support '*' suffix prefix rules.",
 					"Excluded menu slot ids are removed from actionable container counting, search, container sort, and transfers.",
 					"Vanilla horse-like screens share HorseInventoryMenu; excluding 0,1 keeps saddle/armor or carpet slots out while leaving donkey and llama cargo actionable.",
-					"Examples: net.minecraft.world.inventory.HorseInventoryMenu=0,1 or com.example.menu.*=0-2,5"
-			);
-			menuSlotExclusions = defineStringList(builder, "slotExclusions.menuSlotOverrides", List.of(
-					"net.minecraft.world.inventory.HorseInventoryMenu=0,1"
-			));
-			builder.comment(
-					"Anchor offsets still use screenClass=x,y.",
+					"Examples: net.minecraft.world.inventory.HorseInventoryMenu=0,1 or com.example.menu.*=0-2,5");
+			menuSlotExclusions = defineStringList(builder, "slotExclusions.menuSlotOverrides", List.of("net.minecraft.world.inventory.HorseInventoryMenu=0,1"));
+			builder.comment("Anchor offsets still use screenClass=x,y.",
 					"Offsets now move the whole visible container-button group after search/sort-by visibility is decided.",
 					"Default dispenser/dropper offset places the container sort button above player sort.",
-					"Example: net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"
-			);
-			anchorOffsetOverrides = defineStringList(builder, "layout.anchorOffsetOverrides", List.of(
-					"net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"
-			));
+					"Example: net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0");
+			anchorOffsetOverrides = defineStringList(builder, "layout.anchorOffsetOverrides",
+					List.of("net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"));
 			builder.pop();
 		}
 
@@ -95,7 +84,8 @@ public class Config {
 
 		public Client(ForgeConfigSpec.Builder builder) {
 			builder.comment("Client settings").push("client");
-			rememberSearchPhrase = builder.comment("Whether search phrase is remembered and shared between Sophisticated and non-Sophisticated container screens")
+			rememberSearchPhrase = builder
+					.comment("Whether search phrase is remembered and shared between Sophisticated and non-Sophisticated container screens")
 					.define("rememberSearchPhrase", true);
 			builder.pop();
 		}

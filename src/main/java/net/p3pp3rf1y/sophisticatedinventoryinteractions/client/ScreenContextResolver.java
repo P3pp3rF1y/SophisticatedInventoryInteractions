@@ -24,16 +24,9 @@ public class ScreenContextResolver {
 		String menuClassName = menu.getClass().getName();
 		boolean sophisticatedNativeScreen = screen instanceof StorageScreenBase<?> || menu instanceof StorageContainerMenuBase<?>;
 
-		EligibilityDescriptor descriptor = new EligibilityDescriptor(
-				screenClassName,
-				menuClassName,
-				regions.actionableContainerSlotCount(),
-				regions.hasContainerRegion(),
-				regions.hasPlayerRegion(),
-				regions.containerAnchor() != null,
-				regions.playerAnchor() != null,
-				sophisticatedNativeScreen
-		);
+		EligibilityDescriptor descriptor = new EligibilityDescriptor(screenClassName, menuClassName, regions.actionableContainerSlotCount(),
+				regions.hasContainerRegion(), regions.hasPlayerRegion(), regions.containerAnchor() != null, regions.playerAnchor() != null,
+				sophisticatedNativeScreen);
 
 		return Optional.of(new ResolvedScreenContext(screen, regions, descriptor));
 	}

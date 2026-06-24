@@ -39,6 +39,7 @@ public record ContainerInteractionPayload(InteractionActionType actionType, bool
 		if (!validationResult.valid()) {
 			return;
 		}
-		ACTION_EXECUTOR.execute(serverPlayer, validationResult.menu(), validationResult.regions(), payload.actionType(), payload.filterByContents(), payload.sortBy());
+		ACTION_EXECUTOR.execute(serverPlayer, validationResult.menu(), validationResult.regions(), payload.actionType(), payload.filterByContents(),
+				payload.sortBy());
 	}
 }

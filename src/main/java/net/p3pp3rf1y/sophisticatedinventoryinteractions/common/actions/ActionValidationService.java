@@ -28,16 +28,9 @@ public class ActionValidationService {
 			return ValidationResult.valid(menu, regions);
 		}
 
-		EligibilityDescriptor descriptor = new EligibilityDescriptor(
-				null,
-				menu.getClass().getName(),
-				regions.actionableContainerSlotCount(),
-				regions.hasContainerRegion(),
-				regions.hasPlayerRegion(),
-				regions.containerAnchor() != null,
-				regions.playerAnchor() != null,
-				menu instanceof StorageContainerMenuBase<?>
-		);
+		EligibilityDescriptor descriptor = new EligibilityDescriptor(null, menu.getClass().getName(), regions.actionableContainerSlotCount(),
+				regions.hasContainerRegion(), regions.hasPlayerRegion(), regions.containerAnchor() != null, regions.playerAnchor() != null,
+				menu instanceof StorageContainerMenuBase<?>);
 		EligibilityDecision eligibility = menuEligibilityService.evaluate(descriptor);
 		if (!eligibility.eligible()) {
 			return ValidationResult.invalid("ineligible_" + eligibility.reason());
