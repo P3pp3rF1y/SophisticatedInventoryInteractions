@@ -33,7 +33,7 @@ public class InventoryInteractionSortMemory extends SavedData {
 
 	public static InventoryInteractionSortMemory get(ServerLevel level) {
 		ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
-		//noinspection ConstantConditions - overworld is loaded while server levels are available
+		// noinspection ConstantConditions - overworld is loaded while server levels are available
 		DimensionDataStorage storage = overworld.getDataStorage();
 		return storage.computeIfAbsent(new Factory<>(InventoryInteractionSortMemory::new, InventoryInteractionSortMemory::load), SAVED_DATA_NAME);
 	}

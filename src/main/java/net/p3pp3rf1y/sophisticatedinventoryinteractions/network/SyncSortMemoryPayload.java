@@ -12,15 +12,9 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.ClientEventHandle
 
 public record SyncSortMemoryPayload(int containerId, boolean hasSortBy, SortBy sortBy) implements CustomPacketPayload {
 	public static final Type<SyncSortMemoryPayload> TYPE = new Type<>(SophisticatedInventoryInteractions.getRL("sync_sort_memory"));
-	public static final StreamCodec<RegistryFriendlyByteBuf, SyncSortMemoryPayload> STREAM_CODEC = StreamCodec.composite(
-			ByteBufCodecs.INT,
-			SyncSortMemoryPayload::containerId,
-			ByteBufCodecs.BOOL,
-			SyncSortMemoryPayload::hasSortBy,
-			NeoForgeStreamCodecs.enumCodec(SortBy.class),
-			SyncSortMemoryPayload::sortBy,
-			SyncSortMemoryPayload::new
-	);
+	public static final StreamCodec<RegistryFriendlyByteBuf, SyncSortMemoryPayload> STREAM_CODEC = StreamCodec.composite(ByteBufCodecs.INT,
+			SyncSortMemoryPayload::containerId, ByteBufCodecs.BOOL, SyncSortMemoryPayload::hasSortBy, NeoForgeStreamCodecs.enumCodec(SortBy.class),
+			SyncSortMemoryPayload::sortBy, SyncSortMemoryPayload::new);
 
 	public static SyncSortMemoryPayload saved(int containerId, SortBy sortBy) {
 		return new SyncSortMemoryPayload(containerId, true, sortBy);
