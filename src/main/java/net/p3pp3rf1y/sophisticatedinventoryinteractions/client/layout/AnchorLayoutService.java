@@ -6,6 +6,7 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.Config;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 
 import javax.annotation.Nullable;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -28,15 +29,15 @@ public class AnchorLayoutService {
 		int containerAnchorAbsY = screen.getGuiTop() + containerAnchor.y;
 		int rowY = containerAnchorAbsY - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
 		int rightmostContainerButtonX = containerAnchorAbsX + 5;
-		@Nullable ButtonLayout sortByLayout = containerControls.showSortBy() ? new ButtonLayout(rightmostContainerButtonX, rowY) : null;
+		@Nullable
+		ButtonLayout sortByLayout = containerControls.showSortBy() ? new ButtonLayout(rightmostContainerButtonX, rowY) : null;
 		int sortX = containerControls.showSortBy() ? rightmostContainerButtonX - SMALL_BUTTON_SIZE - BUTTON_HORIZONTAL_GAP : rightmostContainerButtonX;
 		ButtonLayout sortLayout = new ButtonLayout(sortX, rowY);
-		@Nullable SearchLayout searchLayout = null;
+		@Nullable
+		SearchLayout searchLayout = null;
 		if (containerControls.showSearch()) {
 			int containerLeftAbsX = slotRegions.actionableContainerSlotIndexes().stream()
-					.mapToInt(slotIndex -> screen.getGuiLeft() + screen.getMenu().getSlot(slotIndex).x)
-					.min()
-					.orElse(sortLayout.x() - SEARCH_MIN_WIDTH);
+					.mapToInt(slotIndex -> screen.getGuiLeft() + screen.getMenu().getSlot(slotIndex).x).min().orElse(sortLayout.x() - SEARCH_MIN_WIDTH);
 			int searchWidth = Math.max(SEARCH_MIN_WIDTH, sortLayout.x() - SEARCH_TO_SORT_GAP - containerLeftAbsX);
 			searchLayout = new SearchLayout(containerLeftAbsX, rowY + 1, searchWidth, SEARCH_HEIGHT);
 		}
@@ -58,14 +59,13 @@ public class AnchorLayoutService {
 			sortByLayout = sortByLayout.offset(override.x(), override.y());
 		}
 
-		return Optional.of(new AnchorLayout(searchLayout, sortLayout, sortByLayout, transferToPlayerX, playerRowY, transferToContainerX, playerRowY, playerSortX, playerRowY));
+		return Optional.of(new AnchorLayout(searchLayout, sortLayout, sortByLayout, transferToPlayerX, playerRowY, transferToContainerX, playerRowY,
+				playerSortX, playerRowY));
 	}
 
 	public Optional<PlayerSortLayout> getPlayerOnlySortLayout(AbstractContainerScreen<?> screen, SlotRegions slotRegions) {
-		Slot playerMainTopRight = slotRegions.playerMainSlotIndexes().stream()
-				.map(slotIndex -> screen.getMenu().getSlot(slotIndex))
-				.min(Comparator.comparingInt((Slot slot) -> slot.y).thenComparingInt(slot -> -slot.x))
-				.orElse(null);
+		Slot playerMainTopRight = slotRegions.playerMainSlotIndexes().stream().map(slotIndex -> screen.getMenu().getSlot(slotIndex))
+				.min(Comparator.comparingInt((Slot slot) -> slot.y).thenComparingInt(slot -> -slot.x)).orElse(null);
 		if (playerMainTopRight == null) {
 			return Optional.empty();
 		}
@@ -101,17 +101,8 @@ public class AnchorLayoutService {
 		private static final Offset ZERO = new Offset(0, 0);
 	}
 
-	public record AnchorLayout(
-			@Nullable SearchLayout searchLayout,
-			ButtonLayout containerSortLayout,
-			@Nullable ButtonLayout sortByLayout,
-			int transferToPlayerX,
-			int transferToPlayerY,
-			int transferToContainerX,
-			int transferToContainerY,
-			int playerSortX,
-			int playerSortY
-	) {
+	public record AnchorLayout(@Nullable SearchLayout searchLayout, ButtonLayout containerSortLayout, @Nullable ButtonLayout sortByLayout,
+			int transferToPlayerX, int transferToPlayerY, int transferToContainerX, int transferToContainerY, int playerSortX, int playerSortY) {
 	}
 
 	public record ContainerControls(boolean showSearch, boolean showSortBy) {

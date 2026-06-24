@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 
 import javax.annotation.Nullable;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -26,10 +27,7 @@ public record StorageSortKey(Type type, String dimension, @Nullable BlockPos blo
 
 	public static StorageSortKey compound(List<StorageSortKey> parts) {
 		List<String> partIds = parts.stream().map(StorageSortKey::toStableId).sorted().toList();
-		String dimension = parts.stream()
-				.map(StorageSortKey::dimension)
-				.min(Comparator.naturalOrder())
-				.orElseThrow();
+		String dimension = parts.stream().map(StorageSortKey::dimension).min(Comparator.naturalOrder()).orElseThrow();
 		return new StorageSortKey(Type.COMPOUND, dimension, null, null, String.join(";", partIds));
 	}
 
@@ -80,9 +78,7 @@ public record StorageSortKey(Type type, String dimension, @Nullable BlockPos blo
 	}
 
 	public enum Type {
-		BLOCK("block"),
-		ENTITY("entity"),
-		COMPOUND("compound");
+		BLOCK("block"), ENTITY("entity"), COMPOUND("compound");
 
 		private final String serializedName;
 
