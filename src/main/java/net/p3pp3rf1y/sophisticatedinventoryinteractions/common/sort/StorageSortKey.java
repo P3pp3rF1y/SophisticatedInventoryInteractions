@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
 import javax.annotation.Nullable;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -27,10 +28,7 @@ public record StorageSortKey(Type type, ResourceLocation dimension, @Nullable Bl
 
 	public static StorageSortKey compound(List<StorageSortKey> parts) {
 		List<String> partIds = parts.stream().map(StorageSortKey::toStableId).sorted().toList();
-		ResourceLocation dimension = parts.stream()
-				.map(StorageSortKey::dimension)
-				.min(Comparator.comparing(ResourceLocation::toString))
-				.orElseThrow();
+		ResourceLocation dimension = parts.stream().map(StorageSortKey::dimension).min(Comparator.comparing(ResourceLocation::toString)).orElseThrow();
 		return new StorageSortKey(Type.COMPOUND, dimension, null, null, String.join(";", partIds));
 	}
 
@@ -62,7 +60,9 @@ public record StorageSortKey(Type type, ResourceLocation dimension, @Nullable Bl
 		return switch (type) {
 			case BLOCK -> tag.contains(BLOCK_POS_TAG) ? Optional.of(block(dimension, BlockPos.of(tag.getLong(BLOCK_POS_TAG)))) : Optional.empty();
 			case ENTITY -> tag.hasUUID(ENTITY_ID_TAG) ? Optional.of(entity(dimension, tag.getUUID(ENTITY_ID_TAG))) : Optional.empty();
-			case COMPOUND -> tag.contains(COMPOUND_ID_TAG) ? Optional.of(new StorageSortKey(Type.COMPOUND, dimension, null, null, tag.getString(COMPOUND_ID_TAG))) : Optional.empty();
+			case COMPOUND -> tag.contains(COMPOUND_ID_TAG)
+					? Optional.of(new StorageSortKey(Type.COMPOUND, dimension, null, null, tag.getString(COMPOUND_ID_TAG)))
+					: Optional.empty();
 		};
 	}
 
@@ -75,9 +75,7 @@ public record StorageSortKey(Type type, ResourceLocation dimension, @Nullable Bl
 	}
 
 	public enum Type {
-		BLOCK("block"),
-		ENTITY("entity"),
-		COMPOUND("compound");
+		BLOCK("block"), ENTITY("entity"), COMPOUND("compound");
 
 		private final String serializedName;
 
