@@ -12,12 +12,15 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions
 import java.util.*;
 
 public class ContainerActionExecutor {
-	public boolean execute(ServerPlayer player, AbstractContainerMenu menu, SlotRegions regions, InteractionActionType action, boolean filterByContents, SortBy sortBy) {
+	public boolean execute(ServerPlayer player, AbstractContainerMenu menu, SlotRegions regions, InteractionActionType action, boolean filterByContents,
+			SortBy sortBy) {
 		boolean changed = switch (action) {
 			case SORT_CONTAINER -> sortRegion(player, menu, regions.actionableContainerSlotIndexes(), sortBy);
 			case SORT_PLAYER -> sortRegion(player, menu, regions.playerMainSlotIndexes(), SortBy.NAME);
-			case TRANSFER_TO_CONTAINER -> transferBetweenRegions(player, menu, regions.playerMainSlotIndexes(), regions.actionableContainerSlotIndexes(), filterByContents);
-			case TRANSFER_TO_PLAYER -> transferBetweenRegions(player, menu, regions.actionableContainerSlotIndexes(), regions.playerSlotIndexes(), filterByContents);
+			case TRANSFER_TO_CONTAINER ->
+				transferBetweenRegions(player, menu, regions.playerMainSlotIndexes(), regions.actionableContainerSlotIndexes(), filterByContents);
+			case TRANSFER_TO_PLAYER ->
+				transferBetweenRegions(player, menu, regions.actionableContainerSlotIndexes(), regions.playerSlotIndexes(), filterByContents);
 		};
 
 		if (changed) {
@@ -41,9 +44,7 @@ public class ContainerActionExecutor {
 			}
 		}
 
-		List<Integer> sortableSlotIndexes = slotIndexes.stream()
-				.filter(slotIndex -> !fixedSlotIndexes.contains(slotIndex))
-				.toList();
+		List<Integer> sortableSlotIndexes = slotIndexes.stream().filter(slotIndex -> !fixedSlotIndexes.contains(slotIndex)).toList();
 		if (sortableSlotIndexes.isEmpty()) {
 			return false;
 		}
@@ -86,7 +87,8 @@ public class ContainerActionExecutor {
 		return !slot.mayPickup(player) || !slot.mayPlace(stack);
 	}
 
-	private boolean transferBetweenRegions(ServerPlayer player, AbstractContainerMenu menu, List<Integer> sourceSlots, List<Integer> targetSlots, boolean filterByContents) {
+	private boolean transferBetweenRegions(ServerPlayer player, AbstractContainerMenu menu, List<Integer> sourceSlots, List<Integer> targetSlots,
+			boolean filterByContents) {
 		boolean changed = false;
 		Set<ItemStackKey> targetStacks = filterByContents ? getUniqueStacks(menu, targetSlots) : Set.of();
 		if (filterByContents && targetStacks.isEmpty()) {
@@ -190,7 +192,8 @@ public class ContainerActionExecutor {
 		return entries;
 	}
 
-	private boolean insertIntoSlots(AbstractContainerMenu menu, List<Integer> targetSlots, Map.Entry<ItemStackKey, Integer> entry, Set<Integer> changedSlotIndexes) {
+	private boolean insertIntoSlots(AbstractContainerMenu menu, List<Integer> targetSlots, Map.Entry<ItemStackKey, Integer> entry,
+			Set<Integer> changedSlotIndexes) {
 		int remaining = entry.getValue();
 		ItemStack template = entry.getKey().stack();
 

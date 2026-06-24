@@ -37,18 +37,10 @@ class ContainerActionExecutorTest {
 	@Test
 	void mergeAndSortStacksOrdersByTotalCountWhenSortingByCount() {
 		ContainerActionExecutor executor = new ContainerActionExecutor();
-		List<ItemStack> stacks = new ArrayList<>(List.of(
-				new ItemStack(Items.IRON_INGOT, 64),
-				new ItemStack(Items.IRON_INGOT, 23),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64),
-				new ItemStack(Items.GOLD_INGOT, 64)
-		));
+		List<ItemStack> stacks = new ArrayList<>(List.of(new ItemStack(Items.IRON_INGOT, 64), new ItemStack(Items.IRON_INGOT, 23),
+				new ItemStack(Items.GOLD_INGOT, 64), new ItemStack(Items.GOLD_INGOT, 64), new ItemStack(Items.GOLD_INGOT, 64),
+				new ItemStack(Items.GOLD_INGOT, 64), new ItemStack(Items.GOLD_INGOT, 64), new ItemStack(Items.GOLD_INGOT, 64),
+				new ItemStack(Items.GOLD_INGOT, 64), new ItemStack(Items.GOLD_INGOT, 64)));
 
 		List<Map.Entry<ItemStackKey, Integer>> sortedStacks = executor.mergeAndSortStacks(stacks, SortBy.COUNT);
 
