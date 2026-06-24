@@ -19,7 +19,8 @@ public class InventoryInteractionSortMemory extends SavedData {
 	private static final String ENTRIES_TAG = "entries";
 	private static final String KEY_TAG = "key";
 	private static final String SORT_BY_TAG = "sortBy";
-	private static final SavedDataType<InventoryInteractionSortMemory> TYPE = new SavedDataType<>(SAVED_DATA_NAME, InventoryInteractionSortMemory::new, CompoundTag.CODEC.xmap(InventoryInteractionSortMemory::load, InventoryInteractionSortMemory::serialize));
+	private static final SavedDataType<InventoryInteractionSortMemory> TYPE = new SavedDataType<>(SAVED_DATA_NAME, InventoryInteractionSortMemory::new,
+			CompoundTag.CODEC.xmap(InventoryInteractionSortMemory::load, InventoryInteractionSortMemory::serialize));
 
 	private final Map<StorageSortKey, SortBy> sortByStorage;
 
@@ -33,7 +34,7 @@ public class InventoryInteractionSortMemory extends SavedData {
 
 	public static InventoryInteractionSortMemory get(ServerLevel level) {
 		ServerLevel overworld = level.getServer().getLevel(Level.OVERWORLD);
-		//noinspection ConstantConditions - overworld is loaded while server levels are available
+		// noinspection ConstantConditions - overworld is loaded while server levels are available
 		DimensionDataStorage storage = overworld.getDataStorage();
 		return storage.computeIfAbsent(TYPE);
 	}
