@@ -11,11 +11,8 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.SophisticatedInventoryIn
 
 public record SetSortMemoryPayload(SortBy sortBy) implements CustomPacketPayload {
 	public static final Type<SetSortMemoryPayload> TYPE = new Type<>(SophisticatedInventoryInteractions.getRL("set_sort_memory"));
-	public static final StreamCodec<RegistryFriendlyByteBuf, SetSortMemoryPayload> STREAM_CODEC = StreamCodec.composite(
-			NeoForgeStreamCodecs.enumCodec(SortBy.class),
-			SetSortMemoryPayload::sortBy,
-			SetSortMemoryPayload::new
-	);
+	public static final StreamCodec<RegistryFriendlyByteBuf, SetSortMemoryPayload> STREAM_CODEC = StreamCodec
+			.composite(NeoForgeStreamCodecs.enumCodec(SortBy.class), SetSortMemoryPayload::sortBy, SetSortMemoryPayload::new);
 
 	@Override
 	public Type<? extends CustomPacketPayload> type() {

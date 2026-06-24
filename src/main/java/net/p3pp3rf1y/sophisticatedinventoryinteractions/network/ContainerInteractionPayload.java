@@ -19,14 +19,9 @@ public record ContainerInteractionPayload(InteractionActionType actionType, bool
 
 	public static final Type<ContainerInteractionPayload> TYPE = new Type<>(SophisticatedInventoryInteractions.getRL("container_interaction"));
 	public static final StreamCodec<RegistryFriendlyByteBuf, ContainerInteractionPayload> STREAM_CODEC = StreamCodec.composite(
-			NeoForgeStreamCodecs.enumCodec(InteractionActionType.class),
-			ContainerInteractionPayload::actionType,
-			ByteBufCodecs.BOOL,
-			ContainerInteractionPayload::filterByContents,
-			NeoForgeStreamCodecs.enumCodec(SortBy.class),
-			ContainerInteractionPayload::sortBy,
-			ContainerInteractionPayload::new
-	);
+			NeoForgeStreamCodecs.enumCodec(InteractionActionType.class), ContainerInteractionPayload::actionType, ByteBufCodecs.BOOL,
+			ContainerInteractionPayload::filterByContents, NeoForgeStreamCodecs.enumCodec(SortBy.class), ContainerInteractionPayload::sortBy,
+			ContainerInteractionPayload::new);
 
 	@Override
 	public Type<? extends CustomPacketPayload> type() {
@@ -42,7 +37,8 @@ public record ContainerInteractionPayload(InteractionActionType actionType, bool
 			if (!validationResult.valid()) {
 				return;
 			}
-			ACTION_EXECUTOR.execute(serverPlayer, validationResult.menu(), validationResult.regions(), payload.actionType(), payload.filterByContents(), payload.sortBy());
+			ACTION_EXECUTOR.execute(serverPlayer, validationResult.menu(), validationResult.regions(), payload.actionType(), payload.filterByContents(),
+					payload.sortBy());
 		});
 	}
 }

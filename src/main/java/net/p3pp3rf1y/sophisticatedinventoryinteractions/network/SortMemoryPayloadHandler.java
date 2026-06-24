@@ -1,7 +1,7 @@
 package net.p3pp3rf1y.sophisticatedinventoryinteractions.network;
 
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions.ActionValidationService;
@@ -33,11 +33,11 @@ public class SortMemoryPayloadHandler {
 
 	private static void syncOpenPlayers(ServerPlayer sourcePlayer, StorageSortKey changedStorageKey, SortBy sortBy) {
 		for (ServerPlayer player : sourcePlayer.getServer().getPlayerList().getPlayers()) {
-			resolveCurrentStorageKey(player)
-					.filter(changedStorageKey::equals)
-					.ifPresent(storageKey -> PacketDistributor.sendToPlayer(player, sortBy == SortBy.NAME ?
-							SyncSortMemoryPayload.notSaved(player.containerMenu.containerId) :
-							SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy)));
+			resolveCurrentStorageKey(player).filter(changedStorageKey::equals)
+					.ifPresent(storageKey -> PacketDistributor.sendToPlayer(player,
+							sortBy == SortBy.NAME
+									? SyncSortMemoryPayload.notSaved(player.containerMenu.containerId)
+									: SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy)));
 		}
 	}
 
