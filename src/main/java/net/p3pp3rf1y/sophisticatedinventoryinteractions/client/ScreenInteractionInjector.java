@@ -4,24 +4,29 @@ import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.*;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.*;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedcore.util.Easing;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.Config;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.AnchorLayoutService;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions.InteractionActionType;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDecision;
@@ -33,9 +38,11 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.SetSortMemoryPay
 import org.lwjgl.system.MemoryUtil;
 
 import javax.annotation.Nullable;
+
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public class ScreenInteractionInjector {
 	private static final int DISABLED_SLOT_X_POS = -2000;
@@ -315,7 +322,8 @@ public class ScreenInteractionInjector {
 			return;
 		}
 
-		if (state.searchBox != null && event.getButton() == 0 && state.searchBox.isFocused() && !state.searchBox.isMouseOver(event.getMouseX(), event.getMouseY())) {
+		if (state.searchBox != null && event.getButton() == 0 && state.searchBox.isFocused()
+				&& !state.searchBox.isMouseOver(event.getMouseX(), event.getMouseY())) {
 			state.searchBox.setFocused(false);
 		}
 
@@ -397,7 +405,8 @@ public class ScreenInteractionInjector {
 		}
 
 		InjectedScreenState state = states.get(containerScreen);
-		ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_CONTAINER, true, state == null ? SortBy.NAME : state.sortByState.getSortBy()));
+		ClientPacketDistributor.sendToServer(
+				new ContainerInteractionPayload(InteractionActionType.SORT_CONTAINER, true, state == null ? SortBy.NAME : state.sortByState.getSortBy()));
 		GuiSoundHelper.playButtonClickSound();
 		return true;
 	}
@@ -413,18 +422,18 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean matchesSortKeybind(InputConstants.Key inputKey) {
-		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND, inputKey);
+		return matchesKeybind(ClientEventHandler.SORT_KEYBIND, inputKey);
 	}
 
 	private boolean matchesTransferToStorageKeybind(InputConstants.Key inputKey) {
-		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_STORAGE_KEYBIND, inputKey);
+		return matchesKeybind(ClientEventHandler.TRANSFER_TO_STORAGE_KEYBIND, inputKey);
 	}
 
 	private boolean matchesTransferToInventoryKeybind(InputConstants.Key inputKey) {
-		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_INVENTORY_KEYBIND, inputKey);
+		return matchesKeybind(ClientEventHandler.TRANSFER_TO_INVENTORY_KEYBIND, inputKey);
 	}
 
-	private boolean matchesKeybind(net.minecraft.client.KeyMapping keyMapping, InputConstants.Key inputKey) {
+	private boolean matchesKeybind(KeyMapping keyMapping, InputConstants.Key inputKey) {
 		return !keyMapping.isUnbound() && keyMapping.getKey().equals(inputKey);
 	}
 
@@ -441,11 +450,8 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean isEligibleForInjectedInteractions(AbstractContainerScreen<?> screen) {
-		return contextResolver.resolve(screen)
-				.map(ScreenContextResolver.ResolvedScreenContext::eligibilityDescriptor)
-				.map(menuEligibilityService::evaluate)
-				.map(EligibilityDecision::eligible)
-				.orElse(false);
+		return contextResolver.resolve(screen).map(ScreenContextResolver.ResolvedScreenContext::eligibilityDescriptor).map(menuEligibilityService::evaluate)
+				.map(EligibilityDecision::eligible).orElse(false);
 	}
 
 	private void initPlayerOnlyScreen(ScreenEvent.Init.Post event, AbstractContainerScreen<?> screen, SlotRegions regions) {
@@ -460,7 +466,8 @@ public class ScreenInteractionInjector {
 	}
 
 	private void initSophisticatedScreen(ScreenEvent.Init.Post event, StorageScreenBase<?> storageScreen, SlotRegions regions) {
-		Optional<AnchorLayoutService.AnchorLayout> layout = anchorLayoutService.getLayout(storageScreen, regions, new AnchorLayoutService.ContainerControls(false, false));
+		Optional<AnchorLayoutService.AnchorLayout> layout = anchorLayoutService.getLayout(storageScreen, regions,
+				new AnchorLayoutService.ContainerControls(false, false));
 		if (layout.isEmpty()) {
 			return;
 		}
@@ -511,58 +518,57 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean isRememberSearchPhraseEnabled() {
-		return net.p3pp3rf1y.sophisticatedinventoryinteractions.Config.CLIENT.rememberSearchPhrase.get();
+		return Config.CLIENT.rememberSearchPhrase.get();
 	}
 
 	private AnchorLayoutService.ContainerControls getContainerControls(SlotRegions regions) {
 		int actionableContainerSlotCount = regions.actionableContainerSlotCount();
-		return new AnchorLayoutService.ContainerControls(
-				actionableContainerSlotCount > net.p3pp3rf1y.sophisticatedinventoryinteractions.Config.COMMON.hideSearchAtOrBelowActionableContainerSlots.get(),
-				actionableContainerSlotCount > net.p3pp3rf1y.sophisticatedinventoryinteractions.Config.COMMON.hideSortByAtOrBelowActionableContainerSlots.get()
-		);
+		return new AnchorLayoutService.ContainerControls(actionableContainerSlotCount > Config.COMMON.hideSearchAtOrBelowActionableContainerSlots.get(),
+				actionableContainerSlotCount > Config.COMMON.hideSortByAtOrBelowActionableContainerSlots.get());
 	}
 
 	private InjectedScreenState createState(AbstractContainerScreen<?> screen, SlotRegions regions, AnchorLayoutService.AnchorLayout layout) {
-		List<Integer> filteredContainerSlotIndexes = new java.util.ArrayList<>(regions.actionableContainerSlotIndexes());
+		List<Integer> filteredContainerSlotIndexes = new ArrayList<>(regions.actionableContainerSlotIndexes());
 		Map<Integer, SlotPosition> originalSlotPositions = new HashMap<>();
 		for (int slotIndex : filteredContainerSlotIndexes) {
 			Slot slot = screen.getMenu().getSlot(slotIndex);
 			originalSlotPositions.put(slotIndex, new SlotPosition(slot.x, slot.y));
 		}
-		List<SlotPosition> containerVisiblePositions = filteredContainerSlotIndexes.stream()
-				.map(originalSlotPositions::get)
-				.toList();
+		List<SlotPosition> containerVisiblePositions = filteredContainerSlotIndexes.stream().map(originalSlotPositions::get).toList();
 		SlotPosition containerTopLeftSlotPosition = containerVisiblePositions.stream()
-				.min((p1, p2) -> p1.y() == p2.y() ? Integer.compare(p1.x(), p2.x()) : Integer.compare(p1.y(), p2.y()))
-				.orElse(new SlotPosition(0, 0));
-		int containerVisibleWidth = containerVisiblePositions.stream()
-				.mapToInt(SlotPosition::x)
-				.max()
-				.orElse(containerTopLeftSlotPosition.x()) - containerTopLeftSlotPosition.x() + SLOT_SIZE;
+				.min((p1, p2) -> p1.y() == p2.y() ? Integer.compare(p1.x(), p2.x()) : Integer.compare(p1.y(), p2.y())).orElse(new SlotPosition(0, 0));
+		int containerVisibleWidth = containerVisiblePositions.stream().mapToInt(SlotPosition::x).max().orElse(containerTopLeftSlotPosition.x())
+				- containerTopLeftSlotPosition.x() + SLOT_SIZE;
 
-		@Nullable InteractionSearchBox searchBox = null;
-		@Nullable NoResultsLabel noResultsLabel = null;
+		@Nullable
+		InteractionSearchBox searchBox = null;
+		@Nullable
+		NoResultsLabel noResultsLabel = null;
 		if (layout.searchLayout() != null) {
-			searchBox = new InteractionSearchBox(new Position(layout.searchLayout().x(), layout.searchLayout().y()), new Dimension(layout.searchLayout().width(), layout.searchLayout().height()));
+			searchBox = new InteractionSearchBox(new Position(layout.searchLayout().x(), layout.searchLayout().y()),
+					new Dimension(layout.searchLayout().width(), layout.searchLayout().height()));
 			searchBox.setRenderInDefaultPass(false);
-			noResultsLabel = new NoResultsLabel(
-					new Position(layout.searchLayout().x(), layout.searchLayout().y() + 13),
-					containerVisibleWidth,
-					Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results"))
-			);
+			noResultsLabel = new NoResultsLabel(new Position(layout.searchLayout().x(), layout.searchLayout().y() + 13), containerVisibleWidth,
+					Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results")));
 			noResultsLabel.setRenderInDefaultPass(false);
 			noResultsLabel.setVisible(false);
 		}
 		SortByState sortByState = new SortByState();
-		Button sortContainer = buildSortButton(layout.containerSortLayout().x(), layout.containerSortLayout().y(), InteractionActionType.SORT_CONTAINER, sortByState);
-		@Nullable ToggleButton<SortBy> sortByButton = layout.sortByLayout() == null ? null : buildSortByButton(layout.sortByLayout().x(), layout.sortByLayout().y(), sortByState);
-		Button transferToContainer = buildTransferButton(layout.transferToPlayerX(), layout.transferToPlayerY(), InteractionActionType.TRANSFER_TO_CONTAINER, true);
-		Button transferToPlayer = buildTransferButton(layout.transferToContainerX(), layout.transferToContainerY(), InteractionActionType.TRANSFER_TO_PLAYER, false);
+		Button sortContainer = buildSortButton(layout.containerSortLayout().x(), layout.containerSortLayout().y(), InteractionActionType.SORT_CONTAINER,
+				sortByState);
+		@Nullable
+		ToggleButton<SortBy> sortByButton = layout.sortByLayout() == null
+				? null
+				: buildSortByButton(layout.sortByLayout().x(), layout.sortByLayout().y(), sortByState);
+		Button transferToContainer = buildTransferButton(layout.transferToPlayerX(), layout.transferToPlayerY(), InteractionActionType.TRANSFER_TO_CONTAINER,
+				true);
+		Button transferToPlayer = buildTransferButton(layout.transferToContainerX(), layout.transferToContainerY(), InteractionActionType.TRANSFER_TO_PLAYER,
+				false);
 		Button sortPlayer = buildPlayerSortButton(layout.playerSortX(), layout.playerSortY());
 
-		InjectedScreenState state = new InjectedScreenState(screen, filteredContainerSlotIndexes, Set.copyOf(filteredContainerSlotIndexes), containerVisiblePositions,
-				containerTopLeftSlotPosition,
-				originalSlotPositions, searchBox, noResultsLabel, sortContainer, sortByButton, transferToPlayer, transferToContainer, sortPlayer, sortByState);
+		InjectedScreenState state = new InjectedScreenState(screen, filteredContainerSlotIndexes, Set.copyOf(filteredContainerSlotIndexes),
+				containerVisiblePositions, containerTopLeftSlotPosition, originalSlotPositions, searchBox, noResultsLabel, sortContainer, sortByButton,
+				transferToPlayer, transferToContainer, sortPlayer, sortByState);
 		if (searchBox != null) {
 			searchBox.setResponder(v -> applySearchFilter(state));
 		}
@@ -598,7 +604,9 @@ public class ScreenInteractionInjector {
 	private Button buildTransferButton(int x, int y, InteractionActionType actionType, boolean toContainer) {
 		ButtonDefinition filteredDefinition = toContainer ? ButtonDefinitions.TRANSFER_TO_STORAGE_FILTERED : ButtonDefinitions.TRANSFER_TO_INVENTORY_FILTERED;
 		ButtonDefinition allDefinition = toContainer ? ButtonDefinitions.TRANSFER_TO_STORAGE : ButtonDefinitions.TRANSFER_TO_INVENTORY;
-		return new TransferButton(new Position(x, y), filterByContents -> ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, filterByContents, SortBy.NAME)), filteredDefinition, allDefinition);
+		return new TransferButton(new Position(x, y),
+				filterByContents -> ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, filterByContents, SortBy.NAME)),
+				filteredDefinition, allDefinition);
 	}
 
 	private static class InjectedScreenState {
@@ -624,12 +632,11 @@ public class ScreenInteractionInjector {
 		private int noResultsVisibleFrames = 0;
 		private String searchPhrase = "";
 
-		private InjectedScreenState(AbstractContainerScreen<?> screen, List<Integer> filteredContainerSlotIndexes,
-				Set<Integer> filteredContainerSlotIndexesSet, List<SlotPosition> containerVisiblePositions,
-				SlotPosition containerTopLeftSlotPosition,
-				Map<Integer, SlotPosition> originalSlotPositions,
-				@Nullable InteractionSearchBox searchBox, @Nullable NoResultsLabel noResultsLabel, Button sortContainerButton, @Nullable ToggleButton<SortBy> sortByButton,
-				Button transferToPlayerButton, Button transferToContainerButton, Button sortPlayerButton, SortByState sortByState) {
+		private InjectedScreenState(AbstractContainerScreen<?> screen, List<Integer> filteredContainerSlotIndexes, Set<Integer> filteredContainerSlotIndexesSet,
+				List<SlotPosition> containerVisiblePositions, SlotPosition containerTopLeftSlotPosition, Map<Integer, SlotPosition> originalSlotPositions,
+				@Nullable InteractionSearchBox searchBox, @Nullable NoResultsLabel noResultsLabel, Button sortContainerButton,
+				@Nullable ToggleButton<SortBy> sortByButton, Button transferToPlayerButton, Button transferToContainerButton, Button sortPlayerButton,
+				SortByState sortByState) {
 			this.screen = screen;
 			this.filteredContainerSlotIndexes = filteredContainerSlotIndexes;
 			this.filteredContainerSlotIndexesSet = filteredContainerSlotIndexesSet;
@@ -681,7 +688,7 @@ public class ScreenInteractionInjector {
 		private static final int TEXT_COLOR = ARGB.opaque(4210752);
 		private static final int LINE_HEIGHT = 9;
 		private int backgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
-		private final List<net.minecraft.util.FormattedCharSequence> lines;
+		private final List<FormattedCharSequence> lines;
 
 		private NoResultsLabel(Position position, int maxWidth, Component labelText) {
 			super(position, new Dimension(maxWidth, LINE_HEIGHT));
@@ -720,7 +727,7 @@ public class ScreenInteractionInjector {
 		}
 
 		@Override
-		public void updateNarration(net.minecraft.client.gui.narration.NarrationElementOutput narrationElementOutput) {
+		public void updateNarration(NarrationElementOutput narrationElementOutput) {
 			// no-op
 		}
 	}
@@ -745,9 +752,9 @@ public class ScreenInteractionInjector {
 		@Override
 		protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
 			if (Minecraft.getInstance().hasShiftDown()) {
-				net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiHelper.blit(guiGraphics, x, y, allDefinition.getForegroundTexture());
+				GuiHelper.blit(guiGraphics, x, y, allDefinition.getForegroundTexture());
 			} else {
-				net.p3pp3rf1y.sophisticatedcore.client.gui.utils.GuiHelper.blit(guiGraphics, x, y, filteredDefinition.getForegroundTexture());
+				GuiHelper.blit(guiGraphics, x, y, filteredDefinition.getForegroundTexture());
 			}
 		}
 
@@ -765,7 +772,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private static class ImmediateTooltipButton extends Button {
-		private ImmediateTooltipButton(Position position, ButtonDefinition buttonDefinition, java.util.function.IntConsumer onClick) {
+		private ImmediateTooltipButton(Position position, ButtonDefinition buttonDefinition, IntConsumer onClick) {
 			super(position, buttonDefinition, onClick);
 		}
 
@@ -826,7 +833,9 @@ public class ScreenInteractionInjector {
 			int minWidth = getHeight();
 			if ((isFocused() && maximizedWidth > getWidth()) || (!isFocused() && getValue().isEmpty() && getWidth() > minWidth)) {
 				float ratio = Easing.EASE_IN_OUT_CUBIC.ease(Math.min((System.currentTimeMillis() - lastFocusChangeTime) / 200f, 1));
-				int currentWidth = isFocused() ? (int) (minWidth + (maximizedWidth - minWidth) * ratio) : (int) (maximizedWidth - (maximizedWidth - minWidth) * ratio);
+				int currentWidth = isFocused()
+						? (int) (minWidth + (maximizedWidth - minWidth) * ratio)
+						: (int) (maximizedWidth - (maximizedWidth - minWidth) * ratio);
 				setPosition(new Position(maximizedX + maximizedWidth - currentWidth, y));
 				updateDimensions(currentWidth, getHeight());
 			}
@@ -837,10 +846,8 @@ public class ScreenInteractionInjector {
 		@Override
 		public void renderTooltip(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY) {
 			if (!isFocused() && isMouseOver(mouseX, mouseY)) {
-				GuiHelper.renderTooltip(screen, guiGraphics, List.of(
-						Component.translatable("gui.sophisticatedcore.text_box.search_box"),
-						Component.translatable("gui.sophisticatedcore.text_box.search_box_detail").withStyle(ChatFormatting.GRAY)
-				), mouseX, mouseY);
+				GuiHelper.renderTooltip(screen, guiGraphics, List.of(Component.translatable("gui.sophisticatedcore.text_box.search_box"),
+						Component.translatable("gui.sophisticatedcore.text_box.search_box_detail").withStyle(ChatFormatting.GRAY)), mouseX, mouseY);
 			}
 		}
 	}

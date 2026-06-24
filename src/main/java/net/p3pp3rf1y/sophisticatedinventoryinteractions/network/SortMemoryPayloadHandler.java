@@ -33,11 +33,11 @@ public class SortMemoryPayloadHandler {
 
 	private static void syncOpenPlayers(ServerPlayer sourcePlayer, StorageSortKey changedStorageKey, SortBy sortBy) {
 		for (ServerPlayer player : sourcePlayer.level().getServer().getPlayerList().getPlayers()) {
-			resolveCurrentStorageKey(player)
-					.filter(changedStorageKey::equals)
-					.ifPresent(storageKey -> PacketDistributor.sendToPlayer(player, sortBy == SortBy.NAME ?
-							SyncSortMemoryPayload.notSaved(player.containerMenu.containerId) :
-							SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy)));
+			resolveCurrentStorageKey(player).filter(changedStorageKey::equals)
+					.ifPresent(storageKey -> PacketDistributor.sendToPlayer(player,
+							sortBy == SortBy.NAME
+									? SyncSortMemoryPayload.notSaved(player.containerMenu.containerId)
+									: SyncSortMemoryPayload.saved(player.containerMenu.containerId, sortBy)));
 		}
 	}
 
