@@ -1,0 +1,8 @@
+{
+  "key.category.sophisticatedinventoryinteractions.main": "Sophisticated Inventory Interactions",
+  "gui.sophisticatedinventoryinteractions.search_hint": "Поиск",
+  "gui.sophisticatedinventoryinteractions.sort_container": "Сортировать инвентарь хранилища",
+  "gui.sophisticatedinventoryinteractions.sort_player": "Сортировать инвентарь игрока",
+  "gui.sophisticatedinventoryinteractions.transfer_to_container": "Перенести в инвентарь хранилища",
+  "gui.sophisticatedinventoryinteractions.transfer_to_player": "Перенести в инвентарь игрока"
+}
