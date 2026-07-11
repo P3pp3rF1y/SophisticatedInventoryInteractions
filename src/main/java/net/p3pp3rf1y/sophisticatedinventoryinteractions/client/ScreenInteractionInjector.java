@@ -162,15 +162,56 @@ public class ScreenInteractionInjector {
 		InjectedScreenState state = states.get(screen);
 		PlayerOnlyScreenState playerOnlyState = playerOnlyStates.get(screen);
 		if (playerOnlyState != null) {
+			updateDynamicLayout(screen, playerOnlyState);
 			playerOnlyState.sortPlayerButton.renderTooltip(screen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
 		}
 		if (state == null) {
 			return;
 		}
 
+		updateDynamicLayout(screen, state);
 		applySearchFilter(state);
 		updateNoResultsBackgroundColor(state);
 		renderTooltips(event, state);
+	}
+
+	private void updateDynamicLayout(AbstractContainerScreen<?> screen, InjectedScreenState state) {
+		int deltaX = screen.getGuiLeft() - state.lastGuiLeft;
+		int deltaY = screen.getGuiTop() - state.lastGuiTop;
+		if (deltaX == 0 && deltaY == 0) {
+			return;
+		}
+
+		if (state.searchBox != null) {
+			state.searchBox.moveBy(deltaX, deltaY);
+		}
+		moveWidget(state.noResultsLabel, deltaX, deltaY);
+		moveWidget(state.sortContainerButton, deltaX, deltaY);
+		moveWidget(state.sortByButton, deltaX, deltaY);
+		moveWidget(state.transferToPlayerButton, deltaX, deltaY);
+		moveWidget(state.transferToContainerButton, deltaX, deltaY);
+		moveWidget(state.sortPlayerButton, deltaX, deltaY);
+		state.lastGuiLeft = screen.getGuiLeft();
+		state.lastGuiTop = screen.getGuiTop();
+		state.hasNoResultsSampledBackgroundColor = false;
+	}
+
+	private void updateDynamicLayout(AbstractContainerScreen<?> screen, PlayerOnlyScreenState state) {
+		int deltaX = screen.getGuiLeft() - state.lastGuiLeft;
+		int deltaY = screen.getGuiTop() - state.lastGuiTop;
+		if (deltaX == 0 && deltaY == 0) {
+			return;
+		}
+
+		moveWidget(state.sortPlayerButton, deltaX, deltaY);
+		state.lastGuiLeft = screen.getGuiLeft();
+		state.lastGuiTop = screen.getGuiTop();
+	}
+
+	private void moveWidget(@Nullable WidgetBase widget, int deltaX, int deltaY) {
+		if (widget != null) {
+			widget.setPosition(new Position(widget.getX() + deltaX, widget.getY() + deltaY));
+		}
 	}
 
 	private void updateNoResultsBackgroundColor(InjectedScreenState state) {
@@ -440,7 +481,7 @@ public class ScreenInteractionInjector {
 
 		Button sortPlayerButton = buildPlayerSortButton(layout.get().playerSortX(), layout.get().playerSortY());
 		event.addListener(sortPlayerButton);
-		playerOnlyStates.put(screen, new PlayerOnlyScreenState(sortPlayerButton));
+		playerOnlyStates.put(screen, new PlayerOnlyScreenState(sortPlayerButton, screen.getGuiLeft(), screen.getGuiTop()));
 	}
 
 	private void initSophisticatedScreen(ScreenEvent.Init.Post event, StorageScreenBase<?> storageScreen, SlotRegions regions) {
@@ -554,12 +595,11 @@ public class ScreenInteractionInjector {
 	}
 
 	private Button buildSortButton(int x, int y, InteractionActionType actionType, SortByState sortByState) {
-		Button button = new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
+		return new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
 			if (mouseButton == 0) {
 				PacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, true, sortByState.getSortBy()));
 			}
 		});
-		return button;
 	}
 
 	private ToggleButton<SortBy> buildSortByButton(int x, int y, SortByState sortByState) {
@@ -605,6 +645,8 @@ public class ScreenInteractionInjector {
 		private final Button transferToContainerButton;
 		private final Button sortPlayerButton;
 		private final SortByState sortByState;
+		private int lastGuiLeft;
+		private int lastGuiTop;
 		private int noResultsSampledBackgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
 		private boolean hasNoResultsSampledBackgroundColor = false;
 		private String searchPhrase = "";
@@ -628,6 +670,8 @@ public class ScreenInteractionInjector {
 			this.transferToContainerButton = transferToContainerButton;
 			this.sortPlayerButton = sortPlayerButton;
 			this.sortByState = sortByState;
+			lastGuiLeft = screen.getGuiLeft();
+			lastGuiTop = screen.getGuiTop();
 		}
 
 		private boolean hasSearchBox() {
@@ -658,7 +702,16 @@ public class ScreenInteractionInjector {
 	private record SophisticatedScreenState(Button sortPlayerButton) {
 	}
 
-	private record PlayerOnlyScreenState(Button sortPlayerButton) {
+	private static class PlayerOnlyScreenState {
+		private final Button sortPlayerButton;
+		private int lastGuiLeft;
+		private int lastGuiTop;
+
+		private PlayerOnlyScreenState(Button sortPlayerButton, int lastGuiLeft, int lastGuiTop) {
+			this.sortPlayerButton = sortPlayerButton;
+			this.lastGuiLeft = lastGuiLeft;
+			this.lastGuiTop = lastGuiTop;
+		}
 	}
 
 	private static class NoResultsLabel extends WidgetBase {
@@ -745,7 +798,7 @@ public class ScreenInteractionInjector {
 		private static final String MAGNIFYING_GLASS = "\uD83D\uDD0D";
 		private static final int UNFOCUSED_COLOR = 0xBBBBBB;
 		private long lastFocusChangeTime = 0;
-		private final int maximizedX;
+		private int maximizedX;
 		private final int maximizedWidth;
 
 		private InteractionSearchBox(Position position, Dimension dimension) {
@@ -757,6 +810,11 @@ public class ScreenInteractionInjector {
 			setUnfocusedEmptyHint(MAGNIFYING_GLASS);
 			maximizedX = position.x();
 			maximizedWidth = dimension.width();
+		}
+
+		private void moveBy(int deltaX, int deltaY) {
+			maximizedX += deltaX;
+			setPosition(new Position(getX() + deltaX, getY() + deltaY));
 		}
 
 		@Override
