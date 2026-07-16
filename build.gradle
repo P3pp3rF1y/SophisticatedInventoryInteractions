@@ -243,6 +243,7 @@ if (hasCurseforgeId) {
         mainFile.changelogType = 'markdown'
         mainFile.changelog = { project.ext.changelog }
         mainFile.addModLoader('NeoForge')
+        mainFile.addGameVersion('Client', 'Server')
         mainFile.releaseType = "${release_type}"
         "${release_versions}".split(',').each {
             mainFile.addGameVersion("${it}")
