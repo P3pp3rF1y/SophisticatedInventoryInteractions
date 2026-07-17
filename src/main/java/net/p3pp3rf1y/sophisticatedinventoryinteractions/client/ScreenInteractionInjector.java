@@ -484,7 +484,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean matchesKeybind(KeyMapping keyMapping, InputConstants.Key inputKey) {
-		return !keyMapping.isUnbound() && keyMapping.getKey().equals(inputKey);
+		return ClientEventHandler.isActiveAndMatchesIgnoringShift(keyMapping, inputKey);
 	}
 
 	private boolean isPlayerInventorySlot(Slot slot) {
