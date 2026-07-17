@@ -475,7 +475,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean matchesKeybind(net.minecraft.client.KeyMapping keyMapping, InputConstants.Key inputKey) {
-		return !keyMapping.isUnbound() && keyMapping.getKey().equals(inputKey);
+		return net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.isActiveAndMatchesIgnoringShift(keyMapping, inputKey);
 	}
 
 	private boolean isPlayerInventorySlot(Slot slot) {
