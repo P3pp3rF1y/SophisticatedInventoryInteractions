@@ -30,6 +30,7 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.ContainerInteractionPayload;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.RequestSortMemoryPayload;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.SetSortMemoryPayload;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryUtil;
 
 import javax.annotation.Nullable;
@@ -353,8 +354,8 @@ public class ScreenInteractionInjector {
 		if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
 			return;
 		}
-		if (tryHandleSortKeybind(event.getScreen(), InputConstants.Type.MOUSE.getOrCreate(event.getButton()))
-				|| tryHandleTransferKeybind(event.getScreen(), InputConstants.Type.MOUSE.getOrCreate(event.getButton()))) {
+		if (tryHandleSortKeybind(event.getScreen(), InputConstants.Type.MOUSE.getOrCreate(event.getButton())) || tryHandleTransferKeybind(event.getScreen(),
+				InputConstants.Type.MOUSE.getOrCreate(event.getButton()), !Minecraft.getInstance().hasShiftDown())) {
 			event.setCanceled(true);
 			return;
 		}
@@ -388,12 +389,13 @@ public class ScreenInteractionInjector {
 
 	public void onKeyPressed(ScreenEvent.KeyPressed.Pre event) {
 		InputConstants.Key key = InputConstants.getKey(event.getKeyEvent());
-		if (tryHandleSortKeybind(event.getScreen(), key) || tryHandleTransferKeybind(event.getScreen(), key)) {
+		boolean shiftDown = Minecraft.getInstance().hasShiftDown() || (event.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0;
+		if (tryHandleSortKeybind(event.getScreen(), key) || tryHandleTransferKeybind(event.getScreen(), key, !shiftDown)) {
 			event.setCanceled(true);
 		}
 	}
 
-	private boolean tryHandleTransferKeybind(Screen screen, InputConstants.Key inputKey) {
+	private boolean tryHandleTransferKeybind(Screen screen, InputConstants.Key inputKey, boolean transferAll) {
 		if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
 			return false;
 		}
@@ -413,7 +415,7 @@ public class ScreenInteractionInjector {
 			return false;
 		}
 
-		ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, !Minecraft.getInstance().hasShiftDown(), SortBy.NAME));
+		ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, transferAll, SortBy.NAME));
 		GuiSoundHelper.playButtonClickSound();
 		return true;
 	}
@@ -463,7 +465,8 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean matchesSortKeybind(InputConstants.Key inputKey) {
-		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND, inputKey);
+		return !net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND.isUnbound()
+				&& net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND.getKey().equals(inputKey);
 	}
 
 	private boolean matchesTransferToStorageKeybind(InputConstants.Key inputKey) {
