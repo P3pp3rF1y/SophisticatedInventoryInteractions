@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public class ScreenInteractionInjector {
 	private static final int DISABLED_SLOT_X_POS = -2000;
@@ -622,7 +623,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private Button buildSortButton(int x, int y, InteractionActionType actionType, SortByState sortByState) {
-		return new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
+		return new ImmediateTooltipButton(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
 			if (mouseButton == 0) {
 				ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, true, sortByState.getSortBy()));
 			}
@@ -639,7 +640,7 @@ public class ScreenInteractionInjector {
 	}
 
 	private Button buildPlayerSortButton(int x, int y) {
-		return new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
+		return new ImmediateTooltipButton(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
 			if (mouseButton == 0) {
 				ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 			}
@@ -793,7 +794,7 @@ public class ScreenInteractionInjector {
 	private record SlotPosition(int x, int y) {
 	}
 
-	private static class TransferButton extends Button {
+	private static class TransferButton extends ImmediateTooltipButton {
 		private final ButtonDefinition filteredDefinition;
 		private final ButtonDefinition allDefinition;
 
@@ -819,6 +820,19 @@ public class ScreenInteractionInjector {
 		@Override
 		protected List<Component> getTooltip() {
 			return Minecraft.getInstance().hasShiftDown() ? allDefinition.getTooltip() : filteredDefinition.getTooltip();
+		}
+	}
+
+	private static class ImmediateTooltipButton extends Button {
+		private ImmediateTooltipButton(Position position, ButtonDefinition buttonDefinition, IntConsumer onClick) {
+			super(position, buttonDefinition, onClick);
+		}
+
+		@Override
+		public void extractTooltip(Screen screen, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+			if (visible && isMouseOver(mouseX, mouseY)) {
+				GuiHelper.extractTooltip(screen, guiGraphics, getTooltip(), mouseX, mouseY);
+			}
 		}
 	}
 
