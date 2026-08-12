@@ -79,11 +79,12 @@ public class ScreenInteractionInjector {
 		}
 
 		if (isPlayerOnlyMenu(screen)) {
-			initPlayerOnlyScreen(event, screen, context.slotRegions());
+			initPlayerOnlyScreen(event, context);
 			return;
 		}
 
 		if (!menuEligibilityService.evaluate(context.eligibilityDescriptor()).eligible()) {
+			initPlayerOnlyScreen(event, context);
 			states.remove(screen);
 			return;
 		}
@@ -406,19 +407,25 @@ public class ScreenInteractionInjector {
 			return false;
 		}
 		if (isPlayerOnlyMenu(containerScreen)) {
+			if (!isEligibleForStandalonePlayerSort(containerScreen)) {
+				return false;
+			}
 			PacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 			GuiSoundHelper.playButtonClickSound();
 			return true;
-		}
-		if (!(screen instanceof StorageScreenBase<?>) && !isEligibleForInjectedInteractions(containerScreen)) {
-			return false;
 		}
 
 		Slot slotUnderMouse = getHoveredSlot(containerScreen);
 		if (slotUnderMouse != null && isPlayerInventorySlot(slotUnderMouse)) {
-			PacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
-			GuiSoundHelper.playButtonClickSound();
-			return true;
+			if (screen instanceof StorageScreenBase<?> || isEligibleForStandalonePlayerSort(containerScreen)) {
+				PacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
+				GuiSoundHelper.playButtonClickSound();
+				return true;
+			}
+			return false;
+		}
+		if (!(screen instanceof StorageScreenBase<?>) && !isEligibleForInjectedInteractions(containerScreen)) {
+			return false;
 		}
 
 		if (screen instanceof StorageScreenBase<?>) {
@@ -475,8 +482,19 @@ public class ScreenInteractionInjector {
 				.map(EligibilityDecision::eligible).orElse(false);
 	}
 
-	private void initPlayerOnlyScreen(ScreenEvent.Init.Post event, AbstractContainerScreen<?> screen, SlotRegions regions) {
-		Optional<AnchorLayoutService.PlayerSortLayout> layout = anchorLayoutService.getPlayerOnlySortLayout(screen, regions);
+	private boolean isEligibleForStandalonePlayerSort(AbstractContainerScreen<?> screen) {
+		return contextResolver.resolve(screen).filter(context -> context.slotRegions().hasPlayerMainRegion())
+				.map(ScreenContextResolver.ResolvedScreenContext::eligibilityDescriptor).map(menuEligibilityService::evaluatePlayerSort)
+				.map(EligibilityDecision::eligible).orElse(false);
+	}
+
+	private void initPlayerOnlyScreen(ScreenEvent.Init.Post event, ScreenContextResolver.ResolvedScreenContext context) {
+		if (!context.slotRegions().hasPlayerMainRegion() || !menuEligibilityService.evaluatePlayerSort(context.eligibilityDescriptor()).eligible()) {
+			return;
+		}
+
+		AbstractContainerScreen<?> screen = context.screen();
+		Optional<AnchorLayoutService.PlayerSortLayout> layout = anchorLayoutService.getPlayerOnlySortLayout(screen, context.slotRegions());
 		if (layout.isEmpty()) {
 			return;
 		}
