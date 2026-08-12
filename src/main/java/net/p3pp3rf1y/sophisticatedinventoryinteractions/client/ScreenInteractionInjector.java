@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -55,6 +56,9 @@ public class ScreenInteractionInjector {
 
 	public void onScreenInit(ScreenEvent.Init.Post event) {
 		if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
+			return;
+		}
+		if (screen instanceof CreativeModeInventoryScreen) {
 			return;
 		}
 		sophisticatedStates.remove(screen);
@@ -404,6 +408,9 @@ public class ScreenInteractionInjector {
 			return false;
 		}
 		if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
+			return false;
+		}
+		if (containerScreen instanceof CreativeModeInventoryScreen) {
 			return false;
 		}
 		if (isPlayerOnlyMenu(containerScreen)) {
