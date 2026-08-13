@@ -2,7 +2,6 @@ package net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.InventoryMenu;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDecision;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDescriptor;
@@ -21,7 +20,7 @@ public class ActionValidationService {
 		}
 
 		SlotRegions regions = slotRegionClassifier.classify(menu);
-		if (actionType == InteractionActionType.SORT_PLAYER && (isSophisticatedMenu(menu) || isPlayerInventoryMenu(menu))) {
+		if (actionType == InteractionActionType.SORT_PLAYER && isSophisticatedMenu(menu)) {
 			if (!regions.hasPlayerRegion()) {
 				return ValidationResult.invalid("missing_player_region");
 			}
@@ -31,6 +30,17 @@ public class ActionValidationService {
 		EligibilityDescriptor descriptor = new EligibilityDescriptor(null, menu.getClass().getName(), regions.actionableContainerSlotCount(),
 				regions.hasContainerRegion(), regions.hasPlayerRegion(), regions.containerAnchor() != null, regions.playerAnchor() != null,
 				menu instanceof StorageContainerMenuBase<?>);
+		if (actionType == InteractionActionType.SORT_PLAYER) {
+			if (!regions.hasPlayerMainRegion()) {
+				return ValidationResult.invalid("missing_player_main_region");
+			}
+			EligibilityDecision playerSortEligibility = menuEligibilityService.evaluatePlayerSort(descriptor);
+			if (!playerSortEligibility.eligible()) {
+				return ValidationResult.invalid("ineligible_" + playerSortEligibility.reason());
+			}
+			return ValidationResult.valid(menu, regions);
+		}
+
 		EligibilityDecision eligibility = menuEligibilityService.evaluate(descriptor);
 		if (!eligibility.eligible()) {
 			return ValidationResult.invalid("ineligible_" + eligibility.reason());
@@ -41,7 +51,7 @@ public class ActionValidationService {
 				return ValidationResult.invalid("missing_container_region");
 			}
 		}
-		if (actionType == InteractionActionType.SORT_PLAYER || actionType == InteractionActionType.TRANSFER_TO_CONTAINER) {
+		if (actionType == InteractionActionType.TRANSFER_TO_CONTAINER) {
 			if (!regions.hasPlayerRegion()) {
 				return ValidationResult.invalid("missing_player_region");
 			}
@@ -52,10 +62,6 @@ public class ActionValidationService {
 
 	private boolean isSophisticatedMenu(AbstractContainerMenu menu) {
 		return menu instanceof StorageContainerMenuBase<?>;
-	}
-
-	private boolean isPlayerInventoryMenu(AbstractContainerMenu menu) {
-		return menu instanceof InventoryMenu;
 	}
 
 	public record ValidationResult(boolean valid, String reason, AbstractContainerMenu menu, SlotRegions regions) {

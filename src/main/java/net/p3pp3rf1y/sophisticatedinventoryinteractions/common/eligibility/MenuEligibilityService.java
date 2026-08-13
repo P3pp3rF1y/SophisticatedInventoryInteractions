@@ -37,6 +37,22 @@ public class MenuEligibilityService {
 		return EligibilityDecision.deny("default_deny");
 	}
 
+	public EligibilityDecision evaluatePlayerSort(EligibilityDescriptor descriptor) {
+		if (descriptor.sophisticatedNativeScreen() || !descriptor.hasPlayerRegion() || !descriptor.hasPlayerAnchor()) {
+			return EligibilityDecision.deny("hard_safety_deny");
+		}
+
+		if (matchesClassRule(Config.COMMON.forceIncludeMenuClasses.get(), descriptor.menuClassName())) {
+			return EligibilityDecision.allow("force_include");
+		}
+
+		if (matchesClassRule(Config.COMMON.excludeMenuClasses.get(), descriptor.menuClassName())) {
+			return EligibilityDecision.deny("exclude");
+		}
+
+		return EligibilityDecision.allow("player_sort");
+	}
+
 	private boolean isHardDenied(EligibilityDescriptor descriptor) {
 		if (descriptor.sophisticatedNativeScreen()) {
 			return true;
