@@ -16,6 +16,10 @@ public record SlotRegions(List<Integer> rawContainerSlotIndexes, List<Integer> a
 		return !playerSlotIndexes.isEmpty();
 	}
 
+	public boolean hasPlayerMainRegion() {
+		return !playerMainSlotIndexes.isEmpty();
+	}
+
 	public int actionableContainerSlotCount() {
 		return actionableContainerSlotIndexes.size();
 	}
