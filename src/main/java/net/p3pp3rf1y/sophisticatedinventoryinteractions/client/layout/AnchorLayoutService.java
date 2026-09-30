@@ -25,8 +25,8 @@ public class AnchorLayoutService {
 		}
 
 		Slot containerAnchor = slotRegions.containerAnchor();
-		int containerAnchorAbsX = screen.getGuiLeft() + containerAnchor.x;
-		int containerAnchorAbsY = screen.getGuiTop() + containerAnchor.y;
+		int containerAnchorAbsX = screen.getLeftPos() + containerAnchor.x;
+		int containerAnchorAbsY = screen.getTopPos() + containerAnchor.y;
 		int rowY = containerAnchorAbsY - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
 		int rightmostContainerButtonX = containerAnchorAbsX + 5;
 		@Nullable
@@ -37,14 +37,14 @@ public class AnchorLayoutService {
 		SearchLayout searchLayout = null;
 		if (containerControls.showSearch()) {
 			int containerLeftAbsX = slotRegions.actionableContainerSlotIndexes().stream()
-					.mapToInt(slotIndex -> screen.getGuiLeft() + screen.getMenu().getSlot(slotIndex).x).min().orElse(sortLayout.x() - SEARCH_MIN_WIDTH);
+					.mapToInt(slotIndex -> screen.getLeftPos() + screen.getMenu().getSlot(slotIndex).x).min().orElse(sortLayout.x() - SEARCH_MIN_WIDTH);
 			int searchWidth = Math.max(SEARCH_MIN_WIDTH, sortLayout.x() - SEARCH_TO_SORT_GAP - containerLeftAbsX);
 			searchLayout = new SearchLayout(containerLeftAbsX, rowY + 1, searchWidth, SEARCH_HEIGHT);
 		}
 
 		Slot playerAnchor = slotRegions.playerAnchor();
-		int playerAnchorAbsX = screen.getGuiLeft() + playerAnchor.x;
-		int playerAnchorAbsY = screen.getGuiTop() + playerAnchor.y;
+		int playerAnchorAbsX = screen.getLeftPos() + playerAnchor.x;
+		int playerAnchorAbsY = screen.getTopPos() + playerAnchor.y;
 		int playerSortX = playerAnchorAbsX + 5;
 		int transferToContainerX = playerSortX - SMALL_BUTTON_SIZE - BUTTON_HORIZONTAL_GAP;
 		int transferToPlayerX = transferToContainerX - SMALL_BUTTON_SIZE - BUTTON_HORIZONTAL_GAP;
@@ -70,8 +70,8 @@ public class AnchorLayoutService {
 			return Optional.empty();
 		}
 
-		int playerSortX = screen.getGuiLeft() + playerMainTopRight.x + 5;
-		int playerSortY = screen.getGuiTop() + playerMainTopRight.y - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
+		int playerSortX = screen.getLeftPos() + playerMainTopRight.x + 5;
+		int playerSortY = screen.getTopPos() + playerMainTopRight.y - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
 
 		return Optional.of(new PlayerSortLayout(playerSortX, playerSortY));
 	}

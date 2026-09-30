@@ -1,8 +1,12 @@
 package net.p3pp3rf1y.sophisticatedinventoryinteractions.client;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.textures.GpuTexture;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -31,12 +35,10 @@ import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.ContainerInteractionPayload;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.RequestSortMemoryPayload;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.SetSortMemoryPayload;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.sdl.SDLKeycode;
 
 import javax.annotation.Nullable;
 
-import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -48,8 +50,6 @@ public class ScreenInteractionInjector {
 	private static final int SLOT_SIZE = 18;
 	private static final int DEFAULT_NO_RESULTS_BG_COLOR = 0xFF777777;
 	private static final int SOPHISTICATED_TRANSFER_SHIFT = BUTTON_SIZE + BUTTON_GAP;
-	private static final ByteBuffer PIXEL_SAMPLE_BUFFER = MemoryUtil.memAlloc(4);
-	private int cachedSampledPixelColor = DEFAULT_NO_RESULTS_BG_COLOR;
 
 	private final ScreenContextResolver contextResolver = new ScreenContextResolver();
 	private final MenuEligibilityService menuEligibilityService = new MenuEligibilityService();
@@ -192,8 +192,8 @@ public class ScreenInteractionInjector {
 	}
 
 	private void updateDynamicLayout(AbstractContainerScreen<?> screen, InjectedScreenState state) {
-		int deltaX = screen.getGuiLeft() - state.lastGuiLeft;
-		int deltaY = screen.getGuiTop() - state.lastGuiTop;
+		int deltaX = screen.getLeftPos() - state.lastGuiLeft;
+		int deltaY = screen.getTopPos() - state.lastGuiTop;
 		if (deltaX == 0 && deltaY == 0) {
 			return;
 		}
@@ -207,21 +207,22 @@ public class ScreenInteractionInjector {
 		moveWidget(state.transferToPlayerButton, deltaX, deltaY);
 		moveWidget(state.transferToContainerButton, deltaX, deltaY);
 		moveWidget(state.sortPlayerButton, deltaX, deltaY);
-		state.lastGuiLeft = screen.getGuiLeft();
-		state.lastGuiTop = screen.getGuiTop();
+		state.lastGuiLeft = screen.getLeftPos();
+		state.lastGuiTop = screen.getTopPos();
 		state.hasNoResultsSampledBackgroundColor = false;
+		state.noResultsSampleGeneration++;
 	}
 
 	private void updateDynamicLayout(AbstractContainerScreen<?> screen, PlayerOnlyScreenState state) {
-		int deltaX = screen.getGuiLeft() - state.lastGuiLeft;
-		int deltaY = screen.getGuiTop() - state.lastGuiTop;
+		int deltaX = screen.getLeftPos() - state.lastGuiLeft;
+		int deltaY = screen.getTopPos() - state.lastGuiTop;
 		if (deltaX == 0 && deltaY == 0) {
 			return;
 		}
 
 		moveWidget(state.sortPlayerButton, deltaX, deltaY);
-		state.lastGuiLeft = screen.getGuiLeft();
-		state.lastGuiTop = screen.getGuiTop();
+		state.lastGuiLeft = screen.getLeftPos();
+		state.lastGuiTop = screen.getTopPos();
 	}
 
 	private void moveWidget(@Nullable WidgetBase widget, int deltaX, int deltaY) {
@@ -235,28 +236,35 @@ public class ScreenInteractionInjector {
 			return;
 		}
 		if (!state.noResultsLabel.isVisibleLabel()) {
+			if (state.noResultsVisibleFrames > 0) {
+				state.noResultsSampleGeneration++;
+			}
 			state.hasNoResultsSampledBackgroundColor = false;
 			state.noResultsVisibleFrames = 0;
 			return;
 		}
 		state.noResultsVisibleFrames++;
 
-		if (!state.hasNoResultsSampledBackgroundColor && state.noResultsVisibleFrames > 2) {
+		if (!state.hasNoResultsSampledBackgroundColor && !state.noResultsSamplePending && state.noResultsVisibleFrames > 2) {
 			SlotPosition topLeftSlotPosition = state.containerTopLeftSlotPosition;
-			int sampleGuiX = state.screen.getGuiLeft() + topLeftSlotPosition.x();
-			int sampleGuiY = state.screen.getGuiTop() + topLeftSlotPosition.y() - 2;
-			state.noResultsSampledBackgroundColor = samplePixelColor(sampleGuiX, sampleGuiY);
-			state.hasNoResultsSampledBackgroundColor = true;
+			int sampleGuiX = state.screen.getLeftPos() + topLeftSlotPosition.x();
+			int sampleGuiY = state.screen.getTopPos() + topLeftSlotPosition.y() - 2;
+			samplePixelColor(state, sampleGuiX, sampleGuiY);
 		}
 		state.noResultsLabel.setBackgroundColor(state.noResultsSampledBackgroundColor);
 	}
 
-	private int samplePixelColor(int guiX, int guiY) {
+	private void samplePixelColor(InjectedScreenState state, int guiX, int guiY) {
 		Window window = Minecraft.getInstance().getWindow();
 		int scaledWidth = window.getGuiScaledWidth();
 		int scaledHeight = window.getGuiScaledHeight();
 		if (scaledWidth <= 0 || scaledHeight <= 0) {
-			return DEFAULT_NO_RESULTS_BG_COLOR;
+			return;
+		}
+		GpuTexture colorTexture = Minecraft.getInstance().gameRenderer.mainRenderTarget().getColorTexture();
+		if (colorTexture == null || colorTexture.getFormat() != GpuFormat.RGBA8_UNORM || colorTexture.getWidth(0) != window.getScreenWidth()
+				|| colorTexture.getHeight(0) != window.getScreenHeight()) {
+			return;
 		}
 
 		int clampedGuiX = Math.max(0, Math.min(guiX, scaledWidth - 1));
@@ -265,24 +273,24 @@ public class ScreenInteractionInjector {
 		int fbYTop = (int) Math.floor((double) clampedGuiY * window.getScreenHeight() / scaledHeight);
 		int fbY = Math.max(0, Math.min(window.getScreenHeight() - 1, window.getScreenHeight() - 1 - fbYTop));
 
-		readPixelToSampleBuffer(fbX, fbY);
-		return cachedSampledPixelColor;
-	}
-
-	private int decodeArgb(ByteBuffer data, int pixelOffset) {
-		int red = Byte.toUnsignedInt(data.get(pixelOffset));
-		int green = Byte.toUnsignedInt(data.get(pixelOffset + 1));
-		int blue = Byte.toUnsignedInt(data.get(pixelOffset + 2));
-		int alpha = Byte.toUnsignedInt(data.get(pixelOffset + 3));
-		return alpha << 24 | red << 16 | green << 8 | blue;
-	}
-
-	private void readPixelToSampleBuffer(int fbX, int fbY) {
-		PIXEL_SAMPLE_BUFFER.clear();
-		GlStateManager._readPixels(fbX, fbY, 1, 1, 6408, 5121, MemoryUtil.memAddress(PIXEL_SAMPLE_BUFFER));
-		if (PIXEL_SAMPLE_BUFFER.capacity() >= 4) {
-			cachedSampledPixelColor = decodeArgb(PIXEL_SAMPLE_BUFFER, 0);
-		}
+		// ScreenEvent.Render.Post runs during GUI extraction, before this frame is drawn; read the previous completed frame.
+		GpuBuffer pixelBuffer = RenderSystem.getDevice().createBuffer(() -> "SII no-results background pixel",
+				GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST, 4);
+		int sampleGeneration = state.noResultsSampleGeneration;
+		state.noResultsSamplePending = true;
+		RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(colorTexture, pixelBuffer, 0L, () -> {
+			try (GpuBufferSlice.MappedView mappedPixel = pixelBuffer.map(true, false)) {
+				if (states.get(state.screen) == state && state.noResultsSampleGeneration == sampleGeneration && state.noResultsLabel.isVisibleLabel()) {
+					var data = mappedPixel.data();
+					state.noResultsSampledBackgroundColor = 0xFF000000 | Byte.toUnsignedInt(data.get(0)) << 16 | Byte.toUnsignedInt(data.get(1)) << 8
+							| Byte.toUnsignedInt(data.get(2));
+					state.hasNoResultsSampledBackgroundColor = true;
+				}
+			} finally {
+				pixelBuffer.close();
+				state.noResultsSamplePending = false;
+			}
+		}, 0, fbX, fbY, 1, 1);
 	}
 
 	private void renderTooltips(ScreenEvent.Render.Post event, InjectedScreenState state) {
@@ -370,7 +378,7 @@ public class ScreenInteractionInjector {
 			return;
 		}
 
-		if (state.searchBox != null && event.getButton() == 0 && state.searchBox.isFocused()
+		if (state.searchBox != null && event.getButton() == InputConstants.MOUSE_BUTTON_LEFT && state.searchBox.isFocused()
 				&& !state.searchBox.isMouseOver(event.getMouseX(), event.getMouseY())) {
 			state.searchBox.setFocused(false);
 		}
@@ -379,7 +387,7 @@ public class ScreenInteractionInjector {
 			return;
 		}
 
-		Slot slot = screen.getSlotUnderMouse();
+		Slot slot = screen.getHoveredSlot();
 		if (slot == null) {
 			return;
 		}
@@ -395,7 +403,7 @@ public class ScreenInteractionInjector {
 
 	public void onKeyPressed(ScreenEvent.KeyPressed.Pre event) {
 		InputConstants.Key key = InputConstants.getKey(event.getKeyEvent());
-		boolean shiftDown = Minecraft.getInstance().hasShiftDown() || (event.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0;
+		boolean shiftDown = Minecraft.getInstance().hasShiftDown() || (event.getModifiers() & SDLKeycode.SDL_KMOD_SHIFT) != 0;
 		if (tryHandleSortKeybind(event.getScreen(), key) || tryHandleTransferKeybind(event.getScreen(), key, !shiftDown)) {
 			event.setCanceled(true);
 		}
@@ -476,7 +484,7 @@ public class ScreenInteractionInjector {
 			double mouseY = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
 			return storageScreen.findSlot(mouseX, mouseY);
 		}
-		return screen.getSlotUnderMouse();
+		return screen.getHoveredSlot();
 	}
 
 	private boolean matchesSortKeybind(InputConstants.Key inputKey) {
@@ -532,7 +540,7 @@ public class ScreenInteractionInjector {
 
 		Button sortPlayerButton = buildPlayerSortButton(layout.get().playerSortX(), layout.get().playerSortY());
 		event.addListener(sortPlayerButton);
-		playerOnlyStates.put(screen, new PlayerOnlyScreenState(sortPlayerButton, screen.getGuiLeft(), screen.getGuiTop()));
+		playerOnlyStates.put(screen, new PlayerOnlyScreenState(sortPlayerButton, screen.getLeftPos(), screen.getTopPos()));
 	}
 
 	private void initSophisticatedScreen(ScreenEvent.Init.Post event, StorageScreenBase<?> storageScreen, SlotRegions regions) {
@@ -649,7 +657,7 @@ public class ScreenInteractionInjector {
 
 	private Button buildSortButton(int x, int y, InteractionActionType actionType, SortByState sortByState) {
 		return new ImmediateTooltipButton(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
-			if (mouseButton == 0) {
+			if (mouseButton == InputConstants.MOUSE_BUTTON_LEFT) {
 				ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, true, sortByState.getSortBy()));
 			}
 		});
@@ -657,7 +665,7 @@ public class ScreenInteractionInjector {
 
 	private ToggleButton<SortBy> buildSortByButton(int x, int y, SortByState sortByState) {
 		return new ToggleButton<>(new Position(x, y), ButtonDefinitions.SORT_BY, mouseButton -> {
-			if (mouseButton == 0) {
+			if (mouseButton == InputConstants.MOUSE_BUTTON_LEFT) {
 				sortByState.nextSortBy();
 				ClientPacketDistributor.sendToServer(new SetSortMemoryPayload(sortByState.getSortBy()));
 			}
@@ -666,7 +674,7 @@ public class ScreenInteractionInjector {
 
 	private Button buildPlayerSortButton(int x, int y) {
 		return new ImmediateTooltipButton(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
-			if (mouseButton == 0) {
+			if (mouseButton == InputConstants.MOUSE_BUTTON_LEFT) {
 				ClientPacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 			}
 		});
@@ -702,6 +710,8 @@ public class ScreenInteractionInjector {
 		private int lastGuiTop;
 		private int noResultsSampledBackgroundColor = DEFAULT_NO_RESULTS_BG_COLOR;
 		private boolean hasNoResultsSampledBackgroundColor = false;
+		private boolean noResultsSamplePending = false;
+		private int noResultsSampleGeneration = 0;
 		private int noResultsVisibleFrames = 0;
 		private String searchPhrase = "";
 
@@ -724,8 +734,8 @@ public class ScreenInteractionInjector {
 			this.transferToContainerButton = transferToContainerButton;
 			this.sortPlayerButton = sortPlayerButton;
 			this.sortByState = sortByState;
-			lastGuiLeft = screen.getGuiLeft();
-			lastGuiTop = screen.getGuiTop();
+			lastGuiLeft = screen.getLeftPos();
+			lastGuiTop = screen.getTopPos();
 		}
 
 		private boolean hasSearchBox() {
@@ -825,7 +835,7 @@ public class ScreenInteractionInjector {
 
 		private TransferButton(Position position, Consumer<Boolean> transferAction, ButtonDefinition filteredDefinition, ButtonDefinition allDefinition) {
 			super(position, filteredDefinition, mouseButton -> {
-				if (mouseButton == 0) {
+				if (mouseButton == InputConstants.MOUSE_BUTTON_LEFT) {
 					transferAction.accept(!Minecraft.getInstance().hasShiftDown());
 				}
 			});
@@ -891,9 +901,9 @@ public class ScreenInteractionInjector {
 			}
 
 			if (isEditable()) {
-				if (event.button() == 0) {
+				if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 					setFocused(true);
-				} else if (event.button() == 1) {
+				} else if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
 					setValue("");
 				}
 				return true;
