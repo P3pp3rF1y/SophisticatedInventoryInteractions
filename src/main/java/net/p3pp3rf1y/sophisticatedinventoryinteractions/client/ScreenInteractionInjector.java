@@ -15,7 +15,6 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.*;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.*;
@@ -25,7 +24,6 @@ import net.p3pp3rf1y.sophisticatedcore.util.Easing;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.AnchorLayoutService;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions.InteractionActionType;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDecision;
-import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.MenuEligibilityService;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.ContainerInteractionPayload;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.network.RequestSortMemoryPayload;
@@ -38,6 +36,11 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
 
+import static net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.SORT_KEYBIND;
+import static net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_INVENTORY_KEYBIND;
+import static net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_STORAGE_KEYBIND;
+import static net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.isActiveAndMatchesIgnoringShift;
+
 public class ScreenInteractionInjector {
 	private static final int DISABLED_SLOT_X_POS = -2000;
 	private static final int BUTTON_GAP = 0;
@@ -48,11 +51,13 @@ public class ScreenInteractionInjector {
 	private static final ByteBuffer PIXEL_SAMPLE_BUFFER = ByteBuffer.allocateDirect(4);
 
 	private final ScreenContextResolver contextResolver = new ScreenContextResolver();
-	private final MenuEligibilityService menuEligibilityService = new MenuEligibilityService();
+	private final ScreenEligibilityService screenEligibilityService = new ScreenEligibilityService();
+	private final ClientScreenHistory screenHistory = new ClientScreenHistory();
 	private final AnchorLayoutService anchorLayoutService = new AnchorLayoutService();
 	private final Map<AbstractContainerScreen<?>, InjectedScreenState> states = new WeakHashMap<>();
 	private final Map<StorageScreenBase<?>, SophisticatedScreenState> sophisticatedStates = new WeakHashMap<>();
 	private final Map<AbstractContainerScreen<?>, PlayerOnlyScreenState> playerOnlyStates = new WeakHashMap<>();
+	private final Map<AbstractContainerScreen<?>, CachedScreenContext> screenContexts = new WeakHashMap<>();
 
 	public void onScreenInit(ScreenEvent.Init.Post event) {
 		if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
@@ -70,12 +75,21 @@ public class ScreenInteractionInjector {
 		playerOnlyStates.remove(screen);
 		String previousSearch = previousState == null ? "" : previousState.getSearchPhrase();
 
-		Optional<ScreenContextResolver.ResolvedScreenContext> resolvedContext = contextResolver.resolve(screen);
-		if (resolvedContext.isEmpty()) {
-			return;
+		CachedScreenContext cachedContext = screenContexts.get(screen);
+		if (cachedContext == null) {
+			Optional<ScreenContextResolver.ResolvedScreenContext> resolvedContext = contextResolver.resolve(screen);
+			if (resolvedContext.isEmpty()) {
+				return;
+			}
+			ScreenContextResolver.ResolvedScreenContext context = resolvedContext.get();
+			cachedContext = new CachedScreenContext(context, screenEligibilityService.evaluate(context.eligibilityDescriptor()),
+					screenEligibilityService.evaluatePlayerSort(context.eligibilityDescriptor()));
+			screenContexts.put(screen, cachedContext);
 		}
 
-		ScreenContextResolver.ResolvedScreenContext context = resolvedContext.get();
+		ScreenContextResolver.ResolvedScreenContext context = cachedContext.context();
+		EligibilityDecision eligibility = cachedContext.eligibility();
+		screenHistory.record(context, screen.getTitle().getString(), eligibility);
 		if (context.eligibilityDescriptor().sophisticatedNativeScreen() && screen instanceof StorageScreenBase<?> storageScreen) {
 			initSophisticatedScreen(event, storageScreen, context.slotRegions());
 			syncSharedSearchToStorageScreen(storageScreen);
@@ -83,12 +97,11 @@ public class ScreenInteractionInjector {
 		}
 
 		if (isPlayerOnlyMenu(screen)) {
-			initPlayerOnlyScreen(event, context);
+			initPlayerOnlyScreen(event, cachedContext);
 			return;
 		}
 
-		if (!menuEligibilityService.evaluate(context.eligibilityDescriptor()).eligible()) {
-			initPlayerOnlyScreen(event, context);
+		if (!eligibility.eligible()) {
 			states.remove(screen);
 			return;
 		}
@@ -147,6 +160,7 @@ public class ScreenInteractionInjector {
 
 		InjectedScreenState state = states.remove(screen);
 		playerOnlyStates.remove(screen);
+		screenContexts.remove(screen);
 		if (state != null) {
 			restoreSlotPositions(state);
 		}
@@ -398,7 +412,7 @@ public class ScreenInteractionInjector {
 			return false;
 		}
 
-		PacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, !shiftDown, SortBy.NAME));
+		sendContainerInteraction(containerScreen, actionType, !shiftDown, SortBy.NAME);
 		GuiSoundHelper.playButtonClickSound();
 		return true;
 	}
@@ -424,7 +438,8 @@ public class ScreenInteractionInjector {
 
 		Slot slotUnderMouse = getHoveredSlot(containerScreen);
 		if (slotUnderMouse != null && isPlayerInventorySlot(slotUnderMouse)) {
-			if (screen instanceof StorageScreenBase<?> || isEligibleForStandalonePlayerSort(containerScreen)) {
+			if (screen instanceof StorageScreenBase<?> || isEligibleForInjectedInteractions(containerScreen)
+					|| isPlayerOnlyMenu(containerScreen) && isEligibleForStandalonePlayerSort(containerScreen)) {
 				PacketDistributor.sendToServer(new ContainerInteractionPayload(InteractionActionType.SORT_PLAYER, true, SortBy.NAME));
 				GuiSoundHelper.playButtonClickSound();
 				return true;
@@ -440,8 +455,7 @@ public class ScreenInteractionInjector {
 		}
 
 		InjectedScreenState state = states.get(containerScreen);
-		PacketDistributor.sendToServer(
-				new ContainerInteractionPayload(InteractionActionType.SORT_CONTAINER, true, state == null ? SortBy.NAME : state.sortByState.getSortBy()));
+		sendContainerInteraction(containerScreen, InteractionActionType.SORT_CONTAINER, true, state == null ? SortBy.NAME : state.sortByState.getSortBy());
 		GuiSoundHelper.playButtonClickSound();
 		return true;
 	}
@@ -457,19 +471,19 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean matchesSortKeybind(InputConstants.Key inputKey) {
-		return !ClientEventHandler.SORT_KEYBIND.isUnbound() && ClientEventHandler.SORT_KEYBIND.getKey().equals(inputKey);
+		return !SORT_KEYBIND.isUnbound() && SORT_KEYBIND.getKey().equals(inputKey);
 	}
 
 	private boolean matchesTransferToStorageKeybind(InputConstants.Key inputKey) {
-		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_STORAGE_KEYBIND, inputKey);
+		return matchesKeybind(TRANSFER_TO_STORAGE_KEYBIND, inputKey);
 	}
 
 	private boolean matchesTransferToInventoryKeybind(InputConstants.Key inputKey) {
-		return matchesKeybind(net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.TRANSFER_TO_INVENTORY_KEYBIND, inputKey);
+		return matchesKeybind(TRANSFER_TO_INVENTORY_KEYBIND, inputKey);
 	}
 
 	private boolean matchesKeybind(net.minecraft.client.KeyMapping keyMapping, InputConstants.Key inputKey) {
-		return net.p3pp3rf1y.sophisticatedcore.client.ClientEventHandler.isActiveAndMatchesIgnoringShift(keyMapping, inputKey);
+		return isActiveAndMatchesIgnoringShift(keyMapping, inputKey);
 	}
 
 	private boolean isPlayerInventorySlot(Slot slot) {
@@ -485,18 +499,26 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean isEligibleForInjectedInteractions(AbstractContainerScreen<?> screen) {
-		return contextResolver.resolve(screen).map(ScreenContextResolver.ResolvedScreenContext::eligibilityDescriptor).map(menuEligibilityService::evaluate)
-				.map(EligibilityDecision::eligible).orElse(false);
+		CachedScreenContext context = screenContexts.get(screen);
+		return context != null && context.eligibility().eligible();
 	}
 
 	private boolean isEligibleForStandalonePlayerSort(AbstractContainerScreen<?> screen) {
-		return contextResolver.resolve(screen).filter(context -> context.slotRegions().hasPlayerMainRegion())
-				.map(ScreenContextResolver.ResolvedScreenContext::eligibilityDescriptor).map(menuEligibilityService::evaluatePlayerSort)
-				.map(EligibilityDecision::eligible).orElse(false);
+		CachedScreenContext context = screenContexts.get(screen);
+		return context != null && context.context().slotRegions().hasPlayerMainRegion() && context.playerSortEligibility().eligible();
 	}
 
-	private void initPlayerOnlyScreen(ScreenEvent.Init.Post event, ScreenContextResolver.ResolvedScreenContext context) {
-		if (!context.slotRegions().hasPlayerMainRegion() || !menuEligibilityService.evaluatePlayerSort(context.eligibilityDescriptor()).eligible()) {
+	private void sendContainerInteraction(AbstractContainerScreen<?> screen, InteractionActionType actionType, boolean filterByContents, SortBy sortBy) {
+		CachedScreenContext context = screenContexts.get(screen);
+		if (context != null) {
+			PacketDistributor.sendToServer(
+					new ContainerInteractionPayload(actionType, filterByContents, sortBy, context.context().slotRegions().excludedContainerSlotIndexes()));
+		}
+	}
+
+	private void initPlayerOnlyScreen(ScreenEvent.Init.Post event, CachedScreenContext cachedContext) {
+		ScreenContextResolver.ResolvedScreenContext context = cachedContext.context();
+		if (!context.slotRegions().hasPlayerMainRegion() || !cachedContext.playerSortEligibility().eligible()) {
 			return;
 		}
 
@@ -509,6 +531,10 @@ public class ScreenInteractionInjector {
 		Button sortPlayerButton = buildPlayerSortButton(layout.get().playerSortX(), layout.get().playerSortY());
 		event.addListener(sortPlayerButton);
 		playerOnlyStates.put(screen, new PlayerOnlyScreenState(sortPlayerButton, screen.getGuiLeft(), screen.getGuiTop()));
+	}
+
+	ClientScreenHistory getScreenHistory() {
+		return screenHistory;
 	}
 
 	private void initSophisticatedScreen(ScreenEvent.Init.Post event, StorageScreenBase<?> storageScreen, SlotRegions regions) {
@@ -600,16 +626,16 @@ public class ScreenInteractionInjector {
 			noResultsLabel.setVisible(false);
 		}
 		SortByState sortByState = new SortByState();
-		Button sortContainer = buildSortButton(layout.containerSortLayout().x(), layout.containerSortLayout().y(), InteractionActionType.SORT_CONTAINER,
+		Button sortContainer = buildSortButton(screen, layout.containerSortLayout().x(), layout.containerSortLayout().y(), InteractionActionType.SORT_CONTAINER,
 				sortByState);
 		@Nullable
 		ToggleButton<SortBy> sortByButton = layout.sortByLayout() == null
 				? null
 				: buildSortByButton(layout.sortByLayout().x(), layout.sortByLayout().y(), sortByState);
-		Button transferToContainer = buildTransferButton(layout.transferToPlayerX(), layout.transferToPlayerY(), InteractionActionType.TRANSFER_TO_CONTAINER,
-				true);
-		Button transferToPlayer = buildTransferButton(layout.transferToContainerX(), layout.transferToContainerY(), InteractionActionType.TRANSFER_TO_PLAYER,
-				false);
+		Button transferToContainer = buildTransferButton(screen, layout.transferToPlayerX(), layout.transferToPlayerY(),
+				InteractionActionType.TRANSFER_TO_CONTAINER, true);
+		Button transferToPlayer = buildTransferButton(screen, layout.transferToContainerX(), layout.transferToContainerY(),
+				InteractionActionType.TRANSFER_TO_PLAYER, false);
 		Button sortPlayer = buildPlayerSortButton(layout.playerSortX(), layout.playerSortY());
 
 		InjectedScreenState state = new InjectedScreenState(screen, filteredContainerSlotIndexes, Set.copyOf(filteredContainerSlotIndexes),
@@ -621,10 +647,10 @@ public class ScreenInteractionInjector {
 		return state;
 	}
 
-	private Button buildSortButton(int x, int y, InteractionActionType actionType, SortByState sortByState) {
+	private Button buildSortButton(AbstractContainerScreen<?> screen, int x, int y, InteractionActionType actionType, SortByState sortByState) {
 		return new Button(new Position(x, y), ButtonDefinitions.SORT, mouseButton -> {
 			if (mouseButton == 0) {
-				PacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, true, sortByState.getSortBy()));
+				sendContainerInteraction(screen, actionType, true, sortByState.getSortBy());
 			}
 		});
 	}
@@ -646,11 +672,10 @@ public class ScreenInteractionInjector {
 		});
 	}
 
-	private Button buildTransferButton(int x, int y, InteractionActionType actionType, boolean toContainer) {
+	private Button buildTransferButton(AbstractContainerScreen<?> screen, int x, int y, InteractionActionType actionType, boolean toContainer) {
 		ButtonDefinition filteredDefinition = toContainer ? ButtonDefinitions.TRANSFER_TO_STORAGE_FILTERED : ButtonDefinitions.TRANSFER_TO_INVENTORY_FILTERED;
 		ButtonDefinition allDefinition = toContainer ? ButtonDefinitions.TRANSFER_TO_STORAGE : ButtonDefinitions.TRANSFER_TO_INVENTORY;
-		return new TransferButton(new Position(x, y),
-				filterByContents -> PacketDistributor.sendToServer(new ContainerInteractionPayload(actionType, filterByContents, SortBy.NAME)),
+		return new TransferButton(new Position(x, y), filterByContents -> sendContainerInteraction(screen, actionType, filterByContents, SortBy.NAME),
 				filteredDefinition, allDefinition);
 	}
 
@@ -727,6 +752,10 @@ public class ScreenInteractionInjector {
 	}
 
 	private record SophisticatedScreenState(Button sortPlayerButton) {
+	}
+
+	private record CachedScreenContext(ScreenContextResolver.ResolvedScreenContext context, EligibilityDecision eligibility,
+			EligibilityDecision playerSortEligibility) {
 	}
 
 	private static class PlayerOnlyScreenState {
