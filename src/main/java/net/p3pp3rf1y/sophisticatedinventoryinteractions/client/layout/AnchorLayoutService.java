@@ -77,7 +77,7 @@ public class AnchorLayoutService {
 	}
 
 	private Offset getOffsetOverride(String screenClassName) {
-		List<? extends String> overrides = Config.COMMON.anchorOffsetOverrides.get();
+		List<? extends String> overrides = Config.CLIENT.anchorOffsetOverrides.get();
 		for (String overrideEntry : overrides) {
 			String[] classAndOffset = overrideEntry.split("=");
 			if (classAndOffset.length != 2 || !screenClassName.equals(classAndOffset[0])) {
