@@ -1,5 +1,6 @@
 package net.p3pp3rf1y.sophisticatedinventoryinteractions.client;
 
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
@@ -16,6 +17,7 @@ public class ClientEventHandler {
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onKeyPressed);
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onScreenRendered);
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onMouseButtonPressed);
+		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onRegisterClientCommands);
 	}
 
 	public static void applySortMemory(int containerId, SortBy sortBy) {
@@ -40,5 +42,9 @@ public class ClientEventHandler {
 
 	private static void onMouseButtonPressed(ScreenEvent.MouseButtonPressed.Pre event) {
 		SCREEN_INTERACTION_INJECTOR.onMouseButtonPressed(event);
+	}
+
+	private static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+		new ClientScreenCommands(SCREEN_INTERACTION_INJECTOR.getScreenHistory()).register(event.getDispatcher());
 	}
 }

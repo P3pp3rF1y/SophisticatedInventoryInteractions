@@ -28,28 +28,11 @@ public class Config {
 	}
 
 	public static class Common {
-		public final ForgeConfigSpec.EnumValue<DefaultPolicy> defaultPolicy;
-		public final ForgeConfigSpec.ConfigValue<List<? extends String>> forceIncludeMenuClasses;
-		public final ForgeConfigSpec.ConfigValue<List<? extends String>> excludeMenuClasses;
-		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includeMenuClasses;
-		public final ForgeConfigSpec.ConfigValue<List<? extends String>> safeMenuClasses;
 		public final ForgeConfigSpec.IntValue hideSearchAtOrBelowActionableContainerSlots;
 		public final ForgeConfigSpec.IntValue hideSortByAtOrBelowActionableContainerSlots;
-		public final ForgeConfigSpec.ConfigValue<List<? extends String>> menuSlotExclusions;
-		public final ForgeConfigSpec.ConfigValue<List<? extends String>> anchorOffsetOverrides;
 
 		public Common(ForgeConfigSpec.Builder builder) {
 			builder.comment("Common settings").push("common");
-			defaultPolicy = builder.comment("Default eligibility policy when no force/include/exclude/safe-list rule matches").defineEnum("defaultPolicy",
-					DefaultPolicy.DENY_BY_DEFAULT);
-			builder.comment("Menu class rules support exact class names and prefix matches using '*' suffix, e.g. net.minecraft.world.inventory.*");
-			forceIncludeMenuClasses = defineStringList(builder, "forceInclude.menuClasses", List.of());
-			excludeMenuClasses = defineStringList(builder, "exclude.menuClasses", List.of());
-			includeMenuClasses = defineStringList(builder, "include.menuClasses", List.of());
-			safeMenuClasses = defineStringList(builder, "safeList.menuClasses",
-					List.of("net.minecraft.world.inventory.ChestMenu", "net.minecraft.world.inventory.HopperMenu",
-							"net.minecraft.world.inventory.DispenserMenu", "net.minecraft.world.inventory.ShulkerBoxMenu",
-							"net.minecraft.world.inventory.HorseInventoryMenu"));
 			hideSearchAtOrBelowActionableContainerSlots = builder
 					.comment("Hide the injected search box when the actionable container slot count is at or below this value.",
 							"Actionable container slots are non-player menu slots after configured slot exclusions are removed.",
@@ -60,34 +43,53 @@ public class Config {
 							"When sort-by is absent, the sort button shifts into the rightmost container-control position.",
 							"Examples with defaults: hopper (5) and dispenser/dropper (9) hide sort-by, chest (27) keeps it.")
 					.defineInRange("controls.sortBy.hideAtOrBelowActionableContainerSlots", 9, 0, Integer.MAX_VALUE);
-			builder.comment("Menu slot exclusions use menuClass=slotId[,slotId|-range...] and support '*' suffix prefix rules.",
-					"Excluded menu slot ids are removed from actionable container counting, search, container sort, and transfers.",
-					"Vanilla horse-like screens share HorseInventoryMenu; excluding 0,1 keeps saddle/armor or carpet slots out while leaving donkey and llama cargo actionable.",
-					"Examples: net.minecraft.world.inventory.HorseInventoryMenu=0,1 or com.example.menu.*=0-2,5");
-			menuSlotExclusions = defineStringList(builder, "slotExclusions.menuSlotOverrides", List.of("net.minecraft.world.inventory.HorseInventoryMenu=0,1"));
-			builder.comment("Anchor offsets still use screenClass=x,y.",
-					"Offsets now move the whole visible container-button group after search/sort-by visibility is decided.",
-					"Default dispenser/dropper offset places the container sort button above player sort.",
-					"Example: net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0");
-			anchorOffsetOverrides = defineStringList(builder, "layout.anchorOffsetOverrides",
-					List.of("net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"));
 			builder.pop();
-		}
-
-		private ForgeConfigSpec.ConfigValue<List<? extends String>> defineStringList(ForgeConfigSpec.Builder builder, String key, List<String> defaults) {
-			return builder.defineListAllowEmpty(key, defaults, o -> o instanceof String);
 		}
 	}
 
 	public static class Client {
+		private static final int DEFAULT_MINIMUM_ACTIONABLE_CONTAINER_SLOTS = 9;
+
 		public final ForgeConfigSpec.BooleanValue rememberSearchPhrase;
+		public final ForgeConfigSpec.EnumValue<DefaultPolicy> defaultScreenPolicy;
+		public final ForgeConfigSpec.IntValue minimumActionableContainerSlots;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> excludeScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includeScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> screenSlotExclusions;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> anchorOffsetOverrides;
 
 		public Client(ForgeConfigSpec.Builder builder) {
 			builder.comment("Client settings").push("client");
 			rememberSearchPhrase = builder
 					.comment("Whether search phrase is remembered and shared between Sophisticated and non-Sophisticated container screens")
 					.define("rememberSearchPhrase", true);
+			builder.comment("Screen rules accept full class names or prefixes ending in '*'.",
+					"They only apply to screens that are safe for inventory interactions.").push("compatibility");
+			defaultScreenPolicy = builder.comment("Choose whether compatible screens are allowed unless listed below.").defineEnum("defaultScreenPolicy",
+					DefaultPolicy.ALLOW_BY_DEFAULT);
+			minimumActionableContainerSlots = builder
+					.comment("Only adds inventory controls to containers with at least this many usable slots.",
+							"With the default, anvils (2) are skipped while dispensers and droppers (9) are included.")
+					.defineInRange("minimumActionableContainerSlots", DEFAULT_MINIMUM_ACTIONABLE_CONTAINER_SLOTS, 0, Integer.MAX_VALUE);
+			excludeScreenClasses = defineStringList(builder, "exclude.screenClasses", List.of());
+			includeScreenClasses = defineStringList(builder, "include.screenClasses", List.of());
+			builder.comment("Lets you leave specific slots out of inventory interactions.",
+					"Use screenClass=menuSlotId[,menuSlotId|-range...]. Screen class prefixes can end in '*'.",
+					"Excluded slots are ignored by the slot count, search, sorting, and transfer buttons.",
+					"Examples: net.minecraft.client.gui.screens.inventory.HorseInventoryScreen=0,1 or com.example.client.*=0-2,5");
+			screenSlotExclusions = defineStringList(builder, "slotExclusions.screenSlotOverrides",
+					List.of("net.minecraft.client.gui.screens.inventory.HorseInventoryScreen=0,1"));
 			builder.pop();
+			builder.comment("Moves the inventory buttons for specific screens.", "Use screenClass=x,y.",
+					"Example: net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0").push("layout");
+			anchorOffsetOverrides = defineStringList(builder, "anchorOffsetOverrides",
+					List.of("net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"));
+			builder.pop();
+			builder.pop();
+		}
+
+		private ForgeConfigSpec.ConfigValue<List<? extends String>> defineStringList(ForgeConfigSpec.Builder builder, String key, List<String> defaults) {
+			return builder.defineListAllowEmpty(key, defaults, o -> o instanceof String);
 		}
 	}
 }
