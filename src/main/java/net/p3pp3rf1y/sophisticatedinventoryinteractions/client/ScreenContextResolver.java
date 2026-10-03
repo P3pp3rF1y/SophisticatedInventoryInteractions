@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public class ScreenContextResolver {
 	private final SlotRegionClassifier slotRegionClassifier = new SlotRegionClassifier();
+	private final ScreenSlotExclusionResolver screenSlotExclusionResolver = new ScreenSlotExclusionResolver();
 
 	public Optional<ResolvedScreenContext> resolve(AbstractContainerScreen<?> screen) {
 		if (screen.getMinecraft().player == null) {
@@ -19,14 +20,15 @@ public class ScreenContextResolver {
 		}
 
 		AbstractContainerMenu menu = screen.getMenu();
-		SlotRegions regions = slotRegionClassifier.classify(menu);
 		String screenClassName = screen.getClass().getName();
+		SlotRegions regions = slotRegionClassifier.classify(menu, screen.getMinecraft().player,
+				screenSlotExclusionResolver.getExcludedSlotIds(screenClassName));
 		String menuClassName = menu.getClass().getName();
 		boolean sophisticatedNativeScreen = screen instanceof StorageScreenBase<?> || menu instanceof StorageContainerMenuBase<?>;
 
 		EligibilityDescriptor descriptor = new EligibilityDescriptor(screenClassName, menuClassName, regions.actionableContainerSlotCount(),
-				regions.hasContainerRegion(), regions.hasPlayerRegion(), regions.containerAnchor() != null, regions.playerAnchor() != null,
-				sophisticatedNativeScreen);
+				regions.hasContainerRegion(), regions.hasCraftingRegion(), regions.hasPlayerRegion(), regions.containerAnchor() != null,
+				regions.playerAnchor() != null, sophisticatedNativeScreen);
 
 		return Optional.of(new ResolvedScreenContext(screen, regions, descriptor));
 	}
