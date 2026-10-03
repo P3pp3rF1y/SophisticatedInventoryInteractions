@@ -1,5 +1,6 @@
 package net.p3pp3rf1y.sophisticatedinventoryinteractions.client;
 
+import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
@@ -16,6 +17,7 @@ public class ClientEventHandler {
 		NeoForge.EVENT_BUS.addListener(ClientEventHandler::onKeyPressed);
 		NeoForge.EVENT_BUS.addListener(ClientEventHandler::onScreenRendered);
 		NeoForge.EVENT_BUS.addListener(ClientEventHandler::onMouseButtonPressed);
+		NeoForge.EVENT_BUS.addListener(ClientEventHandler::onRegisterClientCommands);
 	}
 
 	public static void applySortMemory(int containerId, SortBy sortBy) {
@@ -40,5 +42,9 @@ public class ClientEventHandler {
 
 	private static void onMouseButtonPressed(ScreenEvent.MouseButtonPressed.Pre event) {
 		SCREEN_INTERACTION_INJECTOR.onMouseButtonPressed(event);
+	}
+
+	private static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+		new ClientScreenCommands(SCREEN_INTERACTION_INJECTOR.getScreenHistory()).register(event.getDispatcher());
 	}
 }
