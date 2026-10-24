@@ -3,6 +3,7 @@ package net.p3pp3rf1y.sophisticatedinventoryinteractions.client;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.Config;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDecision;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDescriptor;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 
 import java.util.List;
 
@@ -22,12 +23,11 @@ public class ScreenEligibilityService {
 		return evaluateScreenRules(descriptor, defaultPolicy, includedScreenClasses, excludedScreenClasses);
 	}
 
-	public EligibilityDecision evaluatePlayerSort(EligibilityDescriptor descriptor) {
-		if (descriptor.sophisticatedNativeScreen() || !descriptor.hasPlayerRegion() || !descriptor.hasPlayerAnchor()) {
+	public EligibilityDecision evaluatePlayerSort(SlotRegions regions) {
+		if (!regions.hasPlayerMainRegion()) {
 			return EligibilityDecision.deny("structural_safety_deny");
 		}
-		return evaluateScreenRules(descriptor, Config.CLIENT.defaultScreenPolicy.get(), Config.CLIENT.includeScreenClasses.get(),
-				Config.CLIENT.excludeScreenClasses.get());
+		return EligibilityDecision.allow("player_main_region");
 	}
 
 	private EligibilityDecision evaluateScreenRules(EligibilityDescriptor descriptor, Config.DefaultPolicy defaultPolicy,
