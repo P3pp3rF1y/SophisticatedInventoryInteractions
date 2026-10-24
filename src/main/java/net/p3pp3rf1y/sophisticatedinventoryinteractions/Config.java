@@ -57,6 +57,7 @@ public class Config {
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includeScreenClasses;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> screenSlotExclusions;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> anchorOffsetOverrides;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerSortOffsetOverrides;
 
 		public Client(ForgeConfigSpec.Builder builder) {
 			builder.comment("Client settings").push("client");
@@ -84,6 +85,10 @@ public class Config {
 					"Example: net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0").push("layout");
 			anchorOffsetOverrides = defineStringList(builder, "anchorOffsetOverrides",
 					List.of("net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"));
+			builder.comment("Moves the player inventory sort button for specific screens.", "Use screenClass=x,y.",
+					"Positive x moves right; positive y moves down.");
+			playerSortOffsetOverrides = defineStringList(builder, "playerSortOffsetOverrides",
+					List.of("net.p3pp3rf1y.sophisticatedstorage.client.gui.DecorationTableScreen=0,2"));
 			builder.pop();
 			builder.pop();
 		}

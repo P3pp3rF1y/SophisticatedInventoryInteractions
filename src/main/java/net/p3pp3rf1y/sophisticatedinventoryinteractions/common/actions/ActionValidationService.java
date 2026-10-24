@@ -2,7 +2,6 @@ package net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegionClassifier;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 
@@ -22,13 +21,6 @@ public class ActionValidationService {
 		}
 
 		SlotRegions regions = slotRegionClassifier.classify(menu, player, excludedContainerSlotIndexes);
-		if (actionType == InteractionActionType.SORT_PLAYER && isSophisticatedMenu(menu)) {
-			if (!regions.hasPlayerRegion()) {
-				return ValidationResult.invalid("missing_player_region");
-			}
-			return ValidationResult.valid(menu, regions);
-		}
-
 		if (actionType == InteractionActionType.SORT_PLAYER) {
 			if (!regions.hasPlayerMainRegion()) {
 				return ValidationResult.invalid("missing_player_main_region");
@@ -53,10 +45,6 @@ public class ActionValidationService {
 		}
 
 		return ValidationResult.valid(menu, regions);
-	}
-
-	private boolean isSophisticatedMenu(AbstractContainerMenu menu) {
-		return menu instanceof StorageContainerMenuBase<?>;
 	}
 
 	public record ValidationResult(boolean valid, String reason, AbstractContainerMenu menu, SlotRegions regions) {

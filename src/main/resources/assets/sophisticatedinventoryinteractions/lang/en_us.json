@@ -16,6 +16,7 @@
   "sophisticatedinventoryinteractions.configuration.controls.search.hideAtOrBelowActionableContainerSlots": "Hide Search at X Usable Slots",
   "sophisticatedinventoryinteractions.configuration.controls.sortBy.hideAtOrBelowActionableContainerSlots": "Hide Sort-By at X Usable Slots",
   "sophisticatedinventoryinteractions.configuration.layout.anchorOffsetOverrides": "Control Offsets",
+  "sophisticatedinventoryinteractions.configuration.layout.playerSortOffsetOverrides": "Player Sort Offsets",
   "sophisticatedinventoryinteractions.configuration.rememberSearchPhrase": "Remember Search Phrase",
   "sophisticatedinventoryinteractions.configuration.compatibility": "Compatibility",
   "sophisticatedinventoryinteractions.configuration.defaultScreenPolicy": "Default Screen Policy",
