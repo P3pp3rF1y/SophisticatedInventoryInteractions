@@ -68,6 +68,7 @@ public class Config {
 		public final ModConfigSpec.ConfigValue<List<? extends String>> includeScreenClasses;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> screenSlotExclusions;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> anchorOffsetOverrides;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> playerSortOffsetOverrides;
 
 		public Client(ModConfigSpec.Builder builder) {
 			builder.comment("Client settings").translation(InventoryInteractionsTranslationHelper.INSTANCE.translConfig("client")).push("client");
@@ -100,6 +101,11 @@ public class Config {
 			anchorOffsetOverrides = defineStringList(builder, "anchorOffsetOverrides",
 					InventoryInteractionsTranslationHelper.INSTANCE.translConfig("layout.anchorOffsetOverrides"),
 					List.of("net.minecraft.client.gui.screens.inventory.DispenserScreen=54,0"));
+			builder.comment("Moves the player inventory sort button for specific screens.", "Use screenClass=x,y.",
+					"Positive x moves right; positive y moves down.");
+			playerSortOffsetOverrides = defineStringList(builder, "playerSortOffsetOverrides",
+					InventoryInteractionsTranslationHelper.INSTANCE.translConfig("layout.playerSortOffsetOverrides"),
+					List.of("net.p3pp3rf1y.sophisticatedstorage.client.gui.DecorationTableScreen=0,2"));
 			builder.pop();
 			builder.pop();
 		}

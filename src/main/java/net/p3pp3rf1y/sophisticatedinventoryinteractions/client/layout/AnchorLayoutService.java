@@ -50,7 +50,7 @@ public class AnchorLayoutService {
 		int transferToPlayerX = transferToContainerX - SMALL_BUTTON_SIZE - BUTTON_HORIZONTAL_GAP;
 		int playerRowY = playerAnchorAbsY - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
 
-		Offset override = getOffsetOverride(screen.getClass().getName());
+		Offset override = getOffsetOverride(screen.getClass().getName(), Config.CLIENT.anchorOffsetOverrides.get());
 		if (searchLayout != null) {
 			searchLayout = searchLayout.offset(override.x(), override.y());
 		}
@@ -59,8 +59,7 @@ public class AnchorLayoutService {
 			sortByLayout = sortByLayout.offset(override.x(), override.y());
 		}
 
-		return Optional.of(new AnchorLayout(searchLayout, sortLayout, sortByLayout, transferToPlayerX, playerRowY, transferToContainerX, playerRowY,
-				playerSortX, playerRowY));
+		return Optional.of(new AnchorLayout(searchLayout, sortLayout, sortByLayout, transferToPlayerX, playerRowY, transferToContainerX, playerRowY));
 	}
 
 	public Optional<PlayerSortLayout> getPlayerOnlySortLayout(AbstractContainerScreen<?> screen, SlotRegions slotRegions) {
@@ -72,12 +71,12 @@ public class AnchorLayoutService {
 
 		int playerSortX = screen.getGuiLeft() + playerMainTopRight.x + 5;
 		int playerSortY = screen.getGuiTop() + playerMainTopRight.y - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
+		Offset override = getOffsetOverride(screen.getClass().getName(), Config.CLIENT.playerSortOffsetOverrides.get());
 
-		return Optional.of(new PlayerSortLayout(playerSortX, playerSortY));
+		return Optional.of(new PlayerSortLayout(playerSortX + override.x(), playerSortY + override.y()));
 	}
 
-	private Offset getOffsetOverride(String screenClassName) {
-		List<? extends String> overrides = Config.CLIENT.anchorOffsetOverrides.get();
+	private Offset getOffsetOverride(String screenClassName, List<? extends String> overrides) {
 		for (String overrideEntry : overrides) {
 			String[] classAndOffset = overrideEntry.split("=");
 			if (classAndOffset.length != 2 || !screenClassName.equals(classAndOffset[0])) {
@@ -102,7 +101,7 @@ public class AnchorLayoutService {
 	}
 
 	public record AnchorLayout(@Nullable SearchLayout searchLayout, ButtonLayout containerSortLayout, @Nullable ButtonLayout sortByLayout,
-			int transferToPlayerX, int transferToPlayerY, int transferToContainerX, int transferToContainerY, int playerSortX, int playerSortY) {
+			int transferToPlayerX, int transferToPlayerY, int transferToContainerX, int transferToContainerY) {
 	}
 
 	public record ContainerControls(boolean showSearch, boolean showSortBy) {
