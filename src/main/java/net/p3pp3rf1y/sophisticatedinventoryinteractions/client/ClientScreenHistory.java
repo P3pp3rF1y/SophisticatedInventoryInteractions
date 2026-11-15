@@ -12,9 +12,11 @@ public class ClientScreenHistory {
 	public static final int MAX_ENTRIES = 16;
 	private final Deque<RecentScreen> entries = new ArrayDeque<>();
 
-	public void record(ScreenContextResolver.ResolvedScreenContext context, String title, EligibilityDecision decision) {
-		entries.addFirst(new RecentScreen(context.eligibilityDescriptor().screenClassName(), context.eligibilityDescriptor().menuClassName(), title,
-				decision.eligible(), decision.reason()));
+	public void record(ScreenContextResolver.ResolvedScreenContext context, String title, EligibilityDecision container, EligibilityDecision transfers,
+			EligibilityDecision playerSort) {
+		String className = context.eligibilityDescriptor().screenClassName();
+		entries.removeIf(entry -> entry.screenClassName().equals(className));
+		entries.addFirst(new RecentScreen(className, context.eligibilityDescriptor().menuClassName(), title, container, transfers, playerSort));
 		while (entries.size() > MAX_ENTRIES) {
 			entries.removeLast();
 		}
@@ -28,6 +30,7 @@ public class ClientScreenHistory {
 		return new ArrayList<>(entries).stream().limit(count).toList();
 	}
 
-	public record RecentScreen(String screenClassName, String menuClassName, String title, boolean eligible, String decisionReason) {
+	public record RecentScreen(String screenClassName, String menuClassName, String title, EligibilityDecision container, EligibilityDecision transfers,
+			EligibilityDecision playerSort) {
 	}
 }

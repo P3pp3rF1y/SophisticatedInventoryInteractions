@@ -9,8 +9,9 @@ import java.util.List;
 
 public class ScreenEligibilityService {
 	public EligibilityDecision evaluate(EligibilityDescriptor descriptor) {
-		return evaluate(descriptor, Config.CLIENT.defaultScreenPolicy.get(), Config.CLIENT.minimumActionableContainerSlots.get(),
-				Config.CLIENT.includeScreenClasses.get(), Config.CLIENT.excludeScreenClasses.get());
+		EligibilityDecision safety = evaluate(descriptor, Config.DefaultPolicy.ALLOW_BY_DEFAULT, Config.CLIENT.minimumActionableContainerSlots.get(), List.of(),
+				List.of());
+		return safety.eligible() ? evaluateGroupRules(descriptor, ScreenControlScope.CONTAINER) : safety;
 	}
 
 	EligibilityDecision evaluate(EligibilityDescriptor descriptor, Config.DefaultPolicy defaultPolicy, int minimumActionableContainerSlots,
@@ -23,11 +24,41 @@ public class ScreenEligibilityService {
 		return evaluateScreenRules(descriptor, defaultPolicy, includedScreenClasses, excludedScreenClasses);
 	}
 
-	public EligibilityDecision evaluatePlayerSort(SlotRegions regions) {
+	public EligibilityDecision evaluateTransfers(EligibilityDescriptor descriptor) {
+		return evaluateTransfers(descriptor, Config.CLIENT.defaultScreenPolicy.get(), ScreenControlScope.TRANSFERS.included().get(),
+				ScreenControlScope.TRANSFERS.excluded().get(), Config.CLIENT.includeScreenClasses.get(), Config.CLIENT.excludeScreenClasses.get());
+	}
+
+	EligibilityDecision evaluateTransfers(EligibilityDescriptor descriptor, Config.DefaultPolicy policy, List<? extends String> included,
+			List<? extends String> excluded, List<? extends String> legacyIncluded, List<? extends String> legacyExcluded) {
+		if (descriptor.sophisticatedNativeScreen() || descriptor.hasCraftingRegion() || descriptor.actionableContainerSlotCount() == 0
+				|| !descriptor.hasContainerRegion() || !descriptor.hasPlayerRegion() || !descriptor.hasContainerAnchor() || !descriptor.hasPlayerAnchor()) {
+			return EligibilityDecision.deny("structural_safety_deny");
+		}
+		return evaluateGroupRules(descriptor, policy, included, excluded, legacyIncluded, legacyExcluded);
+	}
+
+	public EligibilityDecision evaluatePlayerSort(EligibilityDescriptor descriptor, SlotRegions regions) {
 		if (!regions.hasPlayerMainRegion()) {
 			return EligibilityDecision.deny("structural_safety_deny");
 		}
-		return EligibilityDecision.allow("player_main_region");
+		return evaluateGroupRules(descriptor, ScreenControlScope.PLAYER_SORT);
+	}
+
+	private EligibilityDecision evaluateGroupRules(EligibilityDescriptor descriptor, ScreenControlScope scope) {
+		boolean player = scope == ScreenControlScope.PLAYER_SORT;
+		return evaluateGroupRules(descriptor, player ? Config.DefaultPolicy.ALLOW_BY_DEFAULT : Config.CLIENT.defaultScreenPolicy.get(), scope.included().get(),
+				scope.excluded().get(), player ? List.of() : Config.CLIENT.includeScreenClasses.get(),
+				player ? List.of() : Config.CLIENT.excludeScreenClasses.get());
+	}
+
+	EligibilityDecision evaluateGroupRules(EligibilityDescriptor descriptor, Config.DefaultPolicy policy, List<? extends String> included,
+			List<? extends String> excluded, List<? extends String> legacyIncluded, List<? extends String> legacyExcluded) {
+		String className = descriptor.screenClassName();
+		if (className != null && (matchesClassRule(included, className) || matchesClassRule(excluded, className))) {
+			return evaluateScreenRules(descriptor, policy, included, excluded);
+		}
+		return evaluateScreenRules(descriptor, policy, legacyIncluded, legacyExcluded);
 	}
 
 	private EligibilityDecision evaluateScreenRules(EligibilityDescriptor descriptor, Config.DefaultPolicy defaultPolicy,
