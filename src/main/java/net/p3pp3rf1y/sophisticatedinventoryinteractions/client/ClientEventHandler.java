@@ -3,6 +3,7 @@ package net.p3pp3rf1y.sophisticatedinventoryinteractions.client;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
 
 public class ClientEventHandler {
@@ -14,10 +15,14 @@ public class ClientEventHandler {
 	public static void registerHandlers() {
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onScreenInit);
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onScreenClosing);
-		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onKeyPressed);
+		MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, ClientEventHandler::onKeyPressed);
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onScreenRendered);
-		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onMouseButtonPressed);
+		MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, ClientEventHandler::onMouseButtonPressed);
 		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onRegisterClientCommands);
+		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onMouseDragged);
+		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onMouseReleased);
+		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onMouseScrolled);
+		MinecraftForge.EVENT_BUS.addListener(ClientEventHandler::onCharacterTyped);
 	}
 
 	public static void applySortMemory(int containerId, SortBy sortBy) {
@@ -45,6 +50,30 @@ public class ClientEventHandler {
 	}
 
 	private static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
-		new ClientScreenCommands(SCREEN_INTERACTION_INJECTOR.getScreenHistory()).register(event.getDispatcher());
+		new ClientScreenCommands(SCREEN_INTERACTION_INJECTOR.getScreenHistory(), SCREEN_INTERACTION_INJECTOR.getLayoutEditor()).register(event.getDispatcher());
+	}
+
+	private static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
+		if (SCREEN_INTERACTION_INJECTOR.getLayoutEditor().mouseDragged(event.getScreen(), event.getMouseX(), event.getMouseY(), event.getMouseButton())) {
+			event.setCanceled(true);
+		}
+	}
+
+	private static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
+		if (SCREEN_INTERACTION_INJECTOR.getLayoutEditor().mouseReleased(event.getScreen())) {
+			event.setCanceled(true);
+		}
+	}
+
+	private static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre event) {
+		if (SCREEN_INTERACTION_INJECTOR.getLayoutEditor().isActive(event.getScreen())) {
+			event.setCanceled(true);
+		}
+	}
+
+	private static void onCharacterTyped(ScreenEvent.CharacterTyped.Pre event) {
+		if (SCREEN_INTERACTION_INJECTOR.getLayoutEditor().isActive(event.getScreen())) {
+			event.setCanceled(true);
+		}
 	}
 }

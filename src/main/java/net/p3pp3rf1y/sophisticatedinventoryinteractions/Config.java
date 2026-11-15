@@ -55,9 +55,16 @@ public class Config {
 		public final ForgeConfigSpec.IntValue minimumActionableContainerSlots;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> excludeScreenClasses;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includeScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includeContainerScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> excludeContainerScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includeTransferScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> excludeTransferScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> includePlayerSortScreenClasses;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> excludePlayerSortScreenClasses;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> screenSlotExclusions;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> anchorOffsetOverrides;
 		public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerSortOffsetOverrides;
+		public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerOffsetOverrides;
 
 		public Client(ForgeConfigSpec.Builder builder) {
 			builder.comment("Client settings").push("client");
@@ -69,11 +76,19 @@ public class Config {
 			defaultScreenPolicy = builder.comment("Choose whether compatible screens are allowed unless listed below.").defineEnum("defaultScreenPolicy",
 					DefaultPolicy.ALLOW_BY_DEFAULT);
 			minimumActionableContainerSlots = builder
-					.comment("Only adds inventory controls to containers with at least this many usable slots.",
+					.comment("Only adds search and container sorting controls to containers with at least this many usable slots. Transfers have no minimum.",
 							"With the default, anvils (2) are skipped while dispensers and droppers (9) are included.")
 					.defineInRange("minimumActionableContainerSlots", DEFAULT_MINIMUM_ACTIONABLE_CONTAINER_SLOTS, 0, Integer.MAX_VALUE);
 			excludeScreenClasses = defineStringList(builder, "exclude.screenClasses", List.of());
 			includeScreenClasses = defineStringList(builder, "include.screenClasses", List.of());
+			builder.comment("Group-specific rules override the legacy screen rules for that group.",
+					"Legacy rules apply to container controls and transfers; player sorting is allowed unless blocked separately.");
+			includeContainerScreenClasses = defineScreenRules(builder, "container", "include");
+			excludeContainerScreenClasses = defineScreenRules(builder, "container", "exclude");
+			includeTransferScreenClasses = defineScreenRules(builder, "transfers", "include");
+			excludeTransferScreenClasses = defineScreenRules(builder, "transfers", "exclude");
+			includePlayerSortScreenClasses = defineScreenRules(builder, "playerSort", "include");
+			excludePlayerSortScreenClasses = defineScreenRules(builder, "playerSort", "exclude");
 			builder.comment("Lets you leave specific slots out of inventory interactions.",
 					"Use screenClass=menuSlotId[,menuSlotId|-range...]. Screen class prefixes can end in '*'.",
 					"Excluded slots are ignored by the slot count, search, sorting, and transfer buttons.",
@@ -89,12 +104,18 @@ public class Config {
 					"Positive x moves right; positive y moves down.");
 			playerSortOffsetOverrides = defineStringList(builder, "playerSortOffsetOverrides",
 					List.of("net.p3pp3rf1y.sophisticatedstorage.client.gui.DecorationTableScreen=0,2"));
+			builder.comment("Moves transfers and player sorting together. Use screenClass=x,y.", "Positive x moves right; positive y moves down.");
+			playerOffsetOverrides = defineStringList(builder, "playerOffsetOverrides", List.of());
 			builder.pop();
 			builder.pop();
 		}
 
 		private ForgeConfigSpec.ConfigValue<List<? extends String>> defineStringList(ForgeConfigSpec.Builder builder, String key, List<String> defaults) {
 			return builder.defineListAllowEmpty(key, defaults, o -> o instanceof String);
+		}
+
+		private ForgeConfigSpec.ConfigValue<List<? extends String>> defineScreenRules(ForgeConfigSpec.Builder builder, String group, String action) {
+			return defineStringList(builder, group + "." + action + ".screenClasses", List.of());
 		}
 	}
 }

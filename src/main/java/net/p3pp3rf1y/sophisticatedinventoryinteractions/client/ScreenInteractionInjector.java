@@ -22,7 +22,12 @@ import net.p3pp3rf1y.sophisticatedcore.client.gui.utils.*;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SortBy;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import net.p3pp3rf1y.sophisticatedcore.util.Easing;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.Config;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.AnchorLayoutService;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.LayoutAdjustmentEditor;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.ScreenLayoutOffsets;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.ScreenLayoutOffsets.Anchor;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.ScreenLayoutOffsets.Offset;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.actions.InteractionActionType;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.eligibility.EligibilityDecision;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
@@ -56,6 +61,7 @@ public class ScreenInteractionInjector {
 	private final ScreenEligibilityService screenEligibilityService = new ScreenEligibilityService();
 	private final ClientScreenHistory screenHistory = new ClientScreenHistory();
 	private final AnchorLayoutService anchorLayoutService = new AnchorLayoutService();
+	private final LayoutAdjustmentEditor layoutEditor = new LayoutAdjustmentEditor();
 	private final Map<AbstractContainerScreen<?>, InjectedScreenState> states = new WeakHashMap<>();
 	private final Map<StorageScreenBase<?>, SophisticatedScreenState> sophisticatedStates = new WeakHashMap<>();
 	private final Map<AbstractContainerScreen<?>, PlayerOnlyScreenState> playerOnlyStates = new WeakHashMap<>();
@@ -68,77 +74,96 @@ public class ScreenInteractionInjector {
 		if (screen instanceof CreativeModeInventoryScreen) {
 			return;
 		}
-		sophisticatedStates.remove(screen);
-
-		InjectedScreenState previousState = states.remove(screen);
-		if (previousState != null) {
-			restoreSlotPositions(previousState);
-		}
-		playerOnlyStates.remove(screen);
-		String previousSearch = previousState == null ? "" : previousState.getSearchPhrase();
-
-		CachedScreenContext cachedContext = screenContexts.get(screen);
-		if (cachedContext == null) {
-			Optional<ScreenContextResolver.ResolvedScreenContext> resolvedContext = contextResolver.resolve(screen);
-			if (resolvedContext.isEmpty()) {
-				return;
-			}
-			ScreenContextResolver.ResolvedScreenContext context = resolvedContext.get();
-			cachedContext = new CachedScreenContext(context, screenEligibilityService.evaluate(context.eligibilityDescriptor()),
-					screenEligibilityService.evaluatePlayerSort(context.slotRegions()));
-			screenContexts.put(screen, cachedContext);
+		String previousSearch = clearInjectedScreenState(screen);
+		Optional<CachedScreenContext> resolvedContext = getOrResolveScreenContext(screen);
+		if (resolvedContext.isEmpty()) {
+			return;
 		}
 
+		CachedScreenContext cachedContext = resolvedContext.get();
 		ScreenContextResolver.ResolvedScreenContext context = cachedContext.context();
-		EligibilityDecision eligibility = cachedContext.eligibility();
-		screenHistory.record(context, screen.getTitle().getString(), eligibility);
+		screenHistory.record(context, screen.getTitle().getString(), cachedContext.eligibility(), cachedContext.transferEligibility(),
+				cachedContext.playerSortEligibility());
 		if (context.eligibilityDescriptor().sophisticatedNativeScreen() && screen instanceof StorageScreenBase<?> storageScreen) {
-			if (cachedContext.playerSortEligibility().eligible()) {
-				initSophisticatedScreen(event, storageScreen, context.slotRegions());
-			}
+			initSophisticatedScreen(event, storageScreen, context.slotRegions(), cachedContext.playerSortEligibility().eligible());
 			syncSharedSearchToStorageScreen(storageScreen);
 			return;
 		}
 
 		initPlayerOnlyScreen(event, cachedContext);
-		if (isPlayerOnlyMenu(screen)) {
+		if (!isPlayerOnlyMenu(screen)) {
+			initContainerAndTransferControls(event, screen, cachedContext, previousSearch);
+		}
+	}
+
+	private String clearInjectedScreenState(AbstractContainerScreen<?> screen) {
+		sophisticatedStates.remove(screen);
+		playerOnlyStates.remove(screen);
+		InjectedScreenState previousState = states.remove(screen);
+		if (previousState == null) {
+			return "";
+		}
+		restoreSlotPositions(previousState);
+		return previousState.getSearchPhrase();
+	}
+
+	private Optional<CachedScreenContext> getOrResolveScreenContext(AbstractContainerScreen<?> screen) {
+		CachedScreenContext cachedContext = screenContexts.get(screen);
+		if (cachedContext != null) {
+			return Optional.of(cachedContext);
+		}
+		return contextResolver.resolve(screen).map(context -> {
+			CachedScreenContext resolvedContext = new CachedScreenContext(context, screenEligibilityService.evaluate(context.eligibilityDescriptor()),
+					screenEligibilityService.evaluateTransfers(context.eligibilityDescriptor()),
+					screenEligibilityService.evaluatePlayerSort(context.eligibilityDescriptor(), context.slotRegions()));
+			screenContexts.put(screen, resolvedContext);
+			return resolvedContext;
+		});
+	}
+
+	private void initContainerAndTransferControls(ScreenEvent.Init.Post event, AbstractContainerScreen<?> screen, CachedScreenContext cachedContext,
+			String previousSearch) {
+		if (!cachedContext.eligibility().eligible() && !cachedContext.transferEligibility().eligible()) {
 			return;
 		}
 
-		if (!eligibility.eligible()) {
-			states.remove(screen);
-			return;
-		}
-
-		AnchorLayoutService.ContainerControls containerControls = getContainerControls(context.slotRegions());
-		Optional<AnchorLayoutService.AnchorLayout> layout = anchorLayoutService.getLayout(screen, context.slotRegions(), containerControls);
+		SlotRegions regions = cachedContext.context().slotRegions();
+		Optional<AnchorLayoutService.AnchorLayout> layout = anchorLayoutService.getLayout(screen, regions, getContainerControls(regions));
 		if (layout.isEmpty()) {
-			states.remove(screen);
 			return;
 		}
 
-		InjectedScreenState state = createState(screen, context.slotRegions(), layout.get());
+		InjectedScreenState state = createState(screen, regions, layout.get(), cachedContext.eligibility().eligible(),
+				cachedContext.transferEligibility().eligible());
 		if (state.hasSearchBox() && isRememberSearchPhraseEnabled() && previousSearch.isEmpty()) {
 			previousSearch = SharedSearchPhraseMemory.getSearchPhrase();
 		}
 		if (state.hasSearchBox() && !previousSearch.isEmpty()) {
 			state.searchBox.setValue(previousSearch);
 		}
-		if (state.searchBox != null) {
-			event.addListener(state.searchBox);
-		}
-		event.addListener(state.sortContainerButton);
-		if (state.sortByButton != null) {
-			event.addListener(state.sortByButton);
-		}
-		event.addListener(state.transferToContainerButton);
-		event.addListener(state.transferToPlayerButton);
-		if (state.noResultsLabel != null) {
-			event.addListener(state.noResultsLabel);
-		}
+		addInjectedWidgets(event, state);
 		states.put(screen, state);
 		InventoryInteractionsPacketHandler.INSTANCE.sendToServer(new RequestSortMemoryPayload());
 		applySearchFilter(state);
+	}
+
+	private void addInjectedWidgets(ScreenEvent.Init.Post event, InjectedScreenState state) {
+		if (state.searchBox != null) {
+			event.addListener(state.searchBox);
+		}
+		if (state.sortContainerButton != null) {
+			event.addListener(state.sortContainerButton);
+		}
+		if (state.sortByButton != null) {
+			event.addListener(state.sortByButton);
+		}
+		if (state.transferToContainerButton != null && state.transferToPlayerButton != null) {
+			event.addListener(state.transferToContainerButton);
+			event.addListener(state.transferToPlayerButton);
+		}
+		if (state.noResultsLabel != null) {
+			event.addListener(state.noResultsLabel);
+		}
 	}
 
 	public void applySortMemory(int containerId, SortBy sortBy) {
@@ -153,6 +178,7 @@ public class ScreenInteractionInjector {
 	}
 
 	public void onScreenClosing(ScreenEvent.Closing event) {
+		layoutEditor.onClosing(event.getScreen());
 		if (event.getScreen() instanceof StorageScreenBase<?> storageScreen) {
 			syncSharedSearchFromStorageScreen(storageScreen);
 			sophisticatedStates.remove(storageScreen);
@@ -176,8 +202,12 @@ public class ScreenInteractionInjector {
 		if (screen instanceof StorageScreenBase<?> storageScreen) {
 			SophisticatedScreenState sophisticatedState = sophisticatedStates.get(storageScreen);
 			if (sophisticatedState != null) {
-				sophisticatedState.sortPlayerButton.renderTooltip(storageScreen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+				updateSophisticatedLayout(storageScreen, sophisticatedState);
+				if (sophisticatedState.sortPlayerButton != null && !layoutEditor.isActive(screen)) {
+					sophisticatedState.sortPlayerButton.renderTooltip(storageScreen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+				}
 			}
+			renderLayoutEditor(event, screen);
 			syncSharedSearchFromStorageScreen(storageScreen);
 			return;
 		}
@@ -186,16 +216,22 @@ public class ScreenInteractionInjector {
 		PlayerOnlyScreenState playerOnlyState = playerOnlyStates.get(screen);
 		if (playerOnlyState != null) {
 			updateDynamicLayout(screen, playerOnlyState);
-			playerOnlyState.sortPlayerButton.renderTooltip(screen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+			if (!layoutEditor.isActive(screen)) {
+				playerOnlyState.sortPlayerButton.renderTooltip(screen, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+			}
 		}
 		if (state == null) {
+			renderLayoutEditor(event, screen);
 			return;
 		}
 
 		updateDynamicLayout(screen, state);
 		applySearchFilter(state);
 		updateNoResultsBackgroundColor(state);
-		renderTooltips(event, state);
+		if (!layoutEditor.isActive(screen)) {
+			renderTooltips(event, state);
+		}
+		renderLayoutEditor(event, screen);
 	}
 
 	private void updateDynamicLayout(AbstractContainerScreen<?> screen, InjectedScreenState state) {
@@ -285,15 +321,23 @@ public class ScreenInteractionInjector {
 		if (state.searchBox != null) {
 			state.searchBox.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
 		}
-		state.sortContainerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		if (state.sortContainerButton != null) {
+			state.sortContainerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		}
 		if (state.sortByButton != null) {
 			state.sortByButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
 		}
-		state.transferToPlayerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
-		state.transferToContainerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		if (state.transferToPlayerButton != null && state.transferToContainerButton != null) {
+			state.transferToPlayerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+			state.transferToContainerButton.renderTooltip(state.screen, guiGraphics, mouseX, mouseY);
+		}
 	}
 
 	private void applySearchFilter(InjectedScreenState state) {
+		if (layoutEditor.isActive(state.screen)) {
+			restoreSlotPositions(state);
+			return;
+		}
 		if (state.searchBox == null) {
 			state.searchPhrase = "";
 			return;
@@ -349,6 +393,10 @@ public class ScreenInteractionInjector {
 	}
 
 	public void onMouseButtonPressed(ScreenEvent.MouseButtonPressed.Pre event) {
+		if (layoutEditor.mousePressed(event.getScreen(), event.getMouseX(), event.getMouseY(), event.getButton())) {
+			event.setCanceled(true);
+			return;
+		}
 		if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
 			return;
 		}
@@ -386,6 +434,13 @@ public class ScreenInteractionInjector {
 	}
 
 	public void onKeyPressed(ScreenEvent.KeyPressed.Pre event) {
+		if (layoutEditor.isActive(event.getScreen())) {
+			if (event.getKeyCode() == GLFW.GLFW_KEY_ESCAPE || Minecraft.getInstance().options.keyInventory.matches(event.getKeyCode(), event.getScanCode())) {
+				event.getScreen().onClose();
+			}
+			event.setCanceled(true);
+			return;
+		}
 		InputConstants.Key key = InputConstants.getKey(event.getKeyCode(), event.getScanCode());
 		boolean shiftDown = Screen.hasShiftDown() || (event.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0;
 		if (tryHandleSortKeybind(event.getScreen(), key) || tryHandleTransferKeybind(event.getScreen(), key, shiftDown)) {
@@ -400,7 +455,8 @@ public class ScreenInteractionInjector {
 		if (screen instanceof StorageScreenBase<?>) {
 			return false;
 		}
-		if (!isEligibleForInjectedInteractions(containerScreen)) {
+		CachedScreenContext context = screenContexts.get(containerScreen);
+		if (context == null || !context.transferEligibility().eligible()) {
 			return false;
 		}
 
@@ -531,25 +587,112 @@ public class ScreenInteractionInjector {
 		return screenHistory;
 	}
 
-	private void initSophisticatedScreen(ScreenEvent.Init.Post event, StorageScreenBase<?> storageScreen, SlotRegions regions) {
+	private void renderLayoutEditor(ScreenEvent.Render.Post event, AbstractContainerScreen<?> screen) {
+		List<LayoutAdjustmentEditor.Group> groups = new ArrayList<>();
+		InjectedScreenState state = states.get(screen);
+		if (state != null && state.sortContainerButton != null) {
+			List<WidgetBase> widgets = new ArrayList<>();
+			widgets.add(state.sortContainerButton);
+			if (state.sortByButton != null) {
+				widgets.add(state.sortByButton);
+			}
+			groups.add(new LayoutAdjustmentEditor.Group(Anchor.CONTAINER, () -> {
+				LayoutAdjustmentEditor.Bounds bounds = widgetBounds(widgets);
+				if (state.searchBox == null) {
+					return bounds;
+				}
+				return union(bounds, new LayoutAdjustmentEditor.Bounds(state.searchBox.maximizedX - 2, state.searchBox.getY() - 2,
+						state.searchBox.maximizedWidth + 4, state.searchBox.getHeight() + 4));
+			}, (dx, dy) -> {
+				widgets.forEach(widget -> moveWidget(widget, dx, dy));
+				if (state.searchBox != null) {
+					state.searchBox.moveBy(dx, dy);
+				}
+			}));
+		}
+		List<WidgetBase> playerWidgets = new ArrayList<>();
+		if (state != null && state.transferToPlayerButton != null && state.transferToContainerButton != null) {
+			playerWidgets.add(state.transferToPlayerButton);
+			playerWidgets.add(state.transferToContainerButton);
+		}
+		PlayerOnlyScreenState playerState = playerOnlyStates.get(screen);
+		if (playerState != null) {
+			playerWidgets.add(playerState.sortPlayerButton);
+		}
+		SophisticatedScreenState nativeState = sophisticatedStates.get(screen);
+		if (nativeState != null && nativeState.sortPlayerButton != null) {
+			playerWidgets.add(nativeState.sortPlayerButton);
+		}
+		if (screen instanceof StorageScreenBase<?> storageScreen && storageScreen.getTransferToInventoryButtonPosition().isPresent()) {
+			groups.add(new LayoutAdjustmentEditor.Group(Anchor.PLAYER, () -> {
+				Position position = storageScreen.getTransferToInventoryButtonPosition().orElseThrow();
+				LayoutAdjustmentEditor.Bounds bounds = new LayoutAdjustmentEditor.Bounds(position.x() - BUTTON_SIZE - 2, position.y() - 2, BUTTON_SIZE * 2 + 4,
+						BUTTON_SIZE + 4);
+				return playerWidgets.isEmpty() ? bounds : union(bounds, widgetBounds(playerWidgets));
+			}, (dx, dy) -> {
+				if (nativeState != null) {
+					updateSophisticatedLayout(storageScreen, nativeState);
+				}
+			}));
+		} else if (!playerWidgets.isEmpty()) {
+			groups.add(new LayoutAdjustmentEditor.Group(Anchor.PLAYER, () -> widgetBounds(playerWidgets),
+					(dx, dy) -> playerWidgets.forEach(widget -> moveWidget(widget, dx, dy))));
+		}
+		layoutEditor.render(screen, groups, event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+		if (layoutEditor.isActive(screen) && state != null) {
+			if (state.searchBox != null) {
+				state.searchBox.setFocused(false);
+			}
+			restoreSlotPositions(state);
+			if (state.noResultsLabel != null) {
+				state.noResultsLabel.setVisible(false);
+			}
+		}
+	}
+
+	private LayoutAdjustmentEditor.Bounds widgetBounds(List<WidgetBase> widgets) {
+		int left = widgets.stream().mapToInt(WidgetBase::getX).min().orElse(0) - 2;
+		int top = widgets.stream().mapToInt(WidgetBase::getY).min().orElse(0) - 2;
+		int right = widgets.stream().mapToInt(widget -> widget.getX() + widget.getWidth()).max().orElse(0) + 2;
+		int bottom = widgets.stream().mapToInt(widget -> widget.getY() + widget.getHeight()).max().orElse(0) + 2;
+		return new LayoutAdjustmentEditor.Bounds(left, top, right - left, bottom - top);
+	}
+
+	private LayoutAdjustmentEditor.Bounds union(LayoutAdjustmentEditor.Bounds first, LayoutAdjustmentEditor.Bounds second) {
+		int left = Math.min(first.x(), second.x());
+		int top = Math.min(first.y(), second.y());
+		return new LayoutAdjustmentEditor.Bounds(left, top, Math.max(first.right(), second.right()) - left, Math.max(first.bottom(), second.bottom()) - top);
+	}
+
+	LayoutAdjustmentEditor getLayoutEditor() {
+		return layoutEditor;
+	}
+
+	private void initSophisticatedScreen(ScreenEvent.Init.Post event, StorageScreenBase<?> storageScreen, SlotRegions regions, boolean showPlayerSort) {
 		Optional<AnchorLayoutService.PlayerSortLayout> layout = anchorLayoutService.getPlayerOnlySortLayout(storageScreen, regions);
 		if (layout.isEmpty()) {
 			return;
 		}
 
-		int sortPlayerX = layout.get().playerSortX();
-		int sortPlayerY = layout.get().playerSortY();
-		storageScreen.setTransferButtonsShift(0);
-		Optional<Position> transferToInventoryPosition = storageScreen.getTransferToInventoryButtonPosition();
-		if (transferToInventoryPosition.isPresent()) {
-			storageScreen.setTransferButtonsShift(-SOPHISTICATED_TRANSFER_SHIFT);
-			sortPlayerX = transferToInventoryPosition.get().x();
-			sortPlayerY = transferToInventoryPosition.get().y();
+		Button sortPlayerButton = showPlayerSort ? buildPlayerSortButton(layout.get().playerSortX(), layout.get().playerSortY()) : null;
+		if (sortPlayerButton != null) {
+			event.addListener(sortPlayerButton);
 		}
+		SophisticatedScreenState state = new SophisticatedScreenState(sortPlayerButton);
+		sophisticatedStates.put(storageScreen, state);
+		updateSophisticatedLayout(storageScreen, state);
+	}
 
-		Button sortPlayerButton = buildPlayerSortButton(sortPlayerX, sortPlayerY);
-		event.addListener(sortPlayerButton);
-		sophisticatedStates.put(storageScreen, new SophisticatedScreenState(sortPlayerButton));
+	private void updateSophisticatedLayout(StorageScreenBase<?> screen, SophisticatedScreenState state) {
+		Offset offset = ScreenLayoutOffsets.get(screen.getClass().getName(), Anchor.PLAYER);
+		int reserve = state.sortPlayerButton == null ? 0 : SOPHISTICATED_TRANSFER_SHIFT;
+		screen.setTransferButtonsOffset(offset.x() - reserve, offset.y());
+		screen.getTransferToInventoryButtonPosition().ifPresent(position -> {
+			if (state.sortPlayerButton != null) {
+				Offset legacy = ScreenLayoutOffsets.parse(screen.getClass().getName(), Config.CLIENT.playerSortOffsetOverrides.get());
+				state.sortPlayerButton.setPosition(new Position(position.x() + reserve + legacy.x(), position.y() + legacy.y()));
+			}
+		});
 	}
 
 	private void syncSharedSearchFromStorageScreen(StorageScreenBase<?> storageScreen) {
@@ -583,18 +726,17 @@ public class ScreenInteractionInjector {
 	}
 
 	private boolean isRememberSearchPhraseEnabled() {
-		return net.p3pp3rf1y.sophisticatedinventoryinteractions.Config.CLIENT.rememberSearchPhrase.get();
+		return Config.CLIENT.rememberSearchPhrase.get();
 	}
 
 	private AnchorLayoutService.ContainerControls getContainerControls(SlotRegions regions) {
 		int actionableContainerSlotCount = regions.actionableContainerSlotCount();
-		return new AnchorLayoutService.ContainerControls(
-				actionableContainerSlotCount > net.p3pp3rf1y.sophisticatedinventoryinteractions.Config.COMMON.hideSearchAtOrBelowActionableContainerSlots.get(),
-				actionableContainerSlotCount > net.p3pp3rf1y.sophisticatedinventoryinteractions.Config.COMMON.hideSortByAtOrBelowActionableContainerSlots
-						.get());
+		return new AnchorLayoutService.ContainerControls(actionableContainerSlotCount > Config.COMMON.hideSearchAtOrBelowActionableContainerSlots.get(),
+				actionableContainerSlotCount > Config.COMMON.hideSortByAtOrBelowActionableContainerSlots.get());
 	}
 
-	private InjectedScreenState createState(AbstractContainerScreen<?> screen, SlotRegions regions, AnchorLayoutService.AnchorLayout layout) {
+	private InjectedScreenState createState(AbstractContainerScreen<?> screen, SlotRegions regions, AnchorLayoutService.AnchorLayout layout, boolean container,
+			boolean transfers) {
 		List<Integer> filteredContainerSlotIndexes = new ArrayList<>(regions.actionableContainerSlotIndexes());
 		Map<Integer, SlotPosition> originalSlotPositions = new HashMap<>();
 		for (int slotIndex : filteredContainerSlotIndexes) {
@@ -611,24 +753,28 @@ public class ScreenInteractionInjector {
 		InteractionSearchBox searchBox = null;
 		@Nullable
 		NoResultsLabel noResultsLabel = null;
-		if (layout.searchLayout() != null) {
+		if (container && layout.searchLayout() != null) {
 			searchBox = new InteractionSearchBox(new Position(layout.searchLayout().x(), layout.searchLayout().y()),
 					new Dimension(layout.searchLayout().width(), layout.searchLayout().height()));
-			noResultsLabel = new NoResultsLabel(new Position(layout.searchLayout().x(), layout.searchLayout().y() + 13), containerVisibleWidth,
-					Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results")));
+			noResultsLabel = new NoResultsLabel(
+					new Position(screen.getGuiLeft() + containerTopLeftSlotPosition.x(), screen.getGuiTop() + containerTopLeftSlotPosition.y()),
+					containerVisibleWidth, Component.translatable(TranslationHelper.INSTANCE.translGui("label.no_search_results")));
 			noResultsLabel.setVisible(false);
 		}
 		SortByState sortByState = new SortByState();
-		Button sortContainer = buildSortButton(screen, layout.containerSortLayout().x(), layout.containerSortLayout().y(), InteractionActionType.SORT_CONTAINER,
-				sortByState);
+		Button sortContainer = container
+				? buildSortButton(screen, layout.containerSortLayout().x(), layout.containerSortLayout().y(), InteractionActionType.SORT_CONTAINER, sortByState)
+				: null;
 		@Nullable
-		ToggleButton<SortBy> sortByButton = layout.sortByLayout() == null
+		ToggleButton<SortBy> sortByButton = !container || layout.sortByLayout() == null
 				? null
 				: buildSortByButton(layout.sortByLayout().x(), layout.sortByLayout().y(), sortByState);
-		Button transferToContainer = buildTransferButton(screen, layout.transferToPlayerX(), layout.transferToPlayerY(),
-				InteractionActionType.TRANSFER_TO_CONTAINER, true);
-		Button transferToPlayer = buildTransferButton(screen, layout.transferToContainerX(), layout.transferToContainerY(),
-				InteractionActionType.TRANSFER_TO_PLAYER, false);
+		Button transferToContainer = transfers
+				? buildTransferButton(screen, layout.transferToPlayerX(), layout.transferToPlayerY(), InteractionActionType.TRANSFER_TO_CONTAINER, true)
+				: null;
+		Button transferToPlayer = transfers
+				? buildTransferButton(screen, layout.transferToContainerX(), layout.transferToContainerY(), InteractionActionType.TRANSFER_TO_PLAYER, false)
+				: null;
 		InjectedScreenState state = new InjectedScreenState(screen, filteredContainerSlotIndexes, Set.copyOf(filteredContainerSlotIndexes),
 				containerVisiblePositions, containerTopLeftSlotPosition, originalSlotPositions, searchBox, noResultsLabel, sortContainer, sortByButton,
 				transferToPlayer, transferToContainer, sortByState);
@@ -681,10 +827,13 @@ public class ScreenInteractionInjector {
 		private final InteractionSearchBox searchBox;
 		@Nullable
 		private final NoResultsLabel noResultsLabel;
+		@Nullable
 		private final Button sortContainerButton;
 		@Nullable
 		private final ToggleButton<SortBy> sortByButton;
+		@Nullable
 		private final Button transferToPlayerButton;
+		@Nullable
 		private final Button transferToContainerButton;
 		private final SortByState sortByState;
 		private int lastGuiLeft;
@@ -695,8 +844,9 @@ public class ScreenInteractionInjector {
 
 		private InjectedScreenState(AbstractContainerScreen<?> screen, List<Integer> filteredContainerSlotIndexes, Set<Integer> filteredContainerSlotIndexesSet,
 				List<SlotPosition> containerVisiblePositions, SlotPosition containerTopLeftSlotPosition, Map<Integer, SlotPosition> originalSlotPositions,
-				@Nullable InteractionSearchBox searchBox, @Nullable NoResultsLabel noResultsLabel, Button sortContainerButton,
-				@Nullable ToggleButton<SortBy> sortByButton, Button transferToPlayerButton, Button transferToContainerButton, SortByState sortByState) {
+				@Nullable InteractionSearchBox searchBox, @Nullable NoResultsLabel noResultsLabel, @Nullable Button sortContainerButton,
+				@Nullable ToggleButton<SortBy> sortByButton, @Nullable Button transferToPlayerButton, @Nullable Button transferToContainerButton,
+				SortByState sortByState) {
 			this.screen = screen;
 			this.filteredContainerSlotIndexes = filteredContainerSlotIndexes;
 			this.filteredContainerSlotIndexesSet = filteredContainerSlotIndexesSet;
@@ -739,11 +889,11 @@ public class ScreenInteractionInjector {
 		}
 	}
 
-	private record SophisticatedScreenState(Button sortPlayerButton) {
+	private record SophisticatedScreenState(@Nullable Button sortPlayerButton) {
 	}
 
 	private record CachedScreenContext(ScreenContextResolver.ResolvedScreenContext context, EligibilityDecision eligibility,
-			EligibilityDecision playerSortEligibility) {
+			EligibilityDecision transferEligibility, EligibilityDecision playerSortEligibility) {
 	}
 
 	private static class PlayerOnlyScreenState {
