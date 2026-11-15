@@ -66,9 +66,16 @@ public class Config {
 		public final ModConfigSpec.IntValue minimumActionableContainerSlots;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> excludeScreenClasses;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> includeScreenClasses;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> includeContainerScreenClasses;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> excludeContainerScreenClasses;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> includeTransferScreenClasses;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> excludeTransferScreenClasses;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> includePlayerSortScreenClasses;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> excludePlayerSortScreenClasses;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> screenSlotExclusions;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> anchorOffsetOverrides;
 		public final ModConfigSpec.ConfigValue<List<? extends String>> playerSortOffsetOverrides;
+		public final ModConfigSpec.ConfigValue<List<? extends String>> playerOffsetOverrides;
 
 		public Client(ModConfigSpec.Builder builder) {
 			builder.comment("Client settings").translation(InventoryInteractionsTranslationHelper.INSTANCE.translConfig("client")).push("client");
@@ -80,7 +87,7 @@ public class Config {
 					.translation(InventoryInteractionsTranslationHelper.INSTANCE.translConfig("defaultScreenPolicy"))
 					.defineEnum("defaultScreenPolicy", DefaultPolicy.ALLOW_BY_DEFAULT);
 			minimumActionableContainerSlots = builder
-					.comment("Only adds inventory controls to containers with at least this many usable slots.",
+					.comment("Only adds search and container sorting controls to containers with at least this many usable slots. Transfers have no minimum.",
 							"With the default, anvils (2) are skipped while dispensers and droppers (9) are included.")
 					.translation(InventoryInteractionsTranslationHelper.INSTANCE.translConfig("minimumActionableContainerSlots"))
 					.defineInRange("minimumActionableContainerSlots", DEFAULT_MINIMUM_ACTIONABLE_CONTAINER_SLOTS, 0, Integer.MAX_VALUE);
@@ -88,6 +95,14 @@ public class Config {
 					InventoryInteractionsTranslationHelper.INSTANCE.translConfig("exclude.screenClasses"), List.of());
 			includeScreenClasses = defineStringList(builder, "include.screenClasses",
 					InventoryInteractionsTranslationHelper.INSTANCE.translConfig("include.screenClasses"), List.of());
+			builder.comment("Group-specific rules override the legacy screen rules for that group.",
+					"Legacy rules apply to container controls and transfers; player sorting is allowed unless blocked separately.");
+			includeContainerScreenClasses = defineScreenRules(builder, "container", "include");
+			excludeContainerScreenClasses = defineScreenRules(builder, "container", "exclude");
+			includeTransferScreenClasses = defineScreenRules(builder, "transfers", "include");
+			excludeTransferScreenClasses = defineScreenRules(builder, "transfers", "exclude");
+			includePlayerSortScreenClasses = defineScreenRules(builder, "playerSort", "include");
+			excludePlayerSortScreenClasses = defineScreenRules(builder, "playerSort", "exclude");
 			builder.comment("Lets you leave specific slots out of inventory interactions.",
 					"Use screenClass=menuSlotId[,menuSlotId|-range...]. Screen class prefixes can end in '*'.",
 					"Excluded slots are ignored by the slot count, search, sorting, and transfer buttons.",
@@ -106,6 +121,9 @@ public class Config {
 			playerSortOffsetOverrides = defineStringList(builder, "playerSortOffsetOverrides",
 					InventoryInteractionsTranslationHelper.INSTANCE.translConfig("layout.playerSortOffsetOverrides"),
 					List.of("net.p3pp3rf1y.sophisticatedstorage.client.gui.DecorationTableScreen=0,2"));
+			builder.comment("Moves transfers and player sorting together. Use screenClass=x,y.", "Positive x moves right; positive y moves down.");
+			playerOffsetOverrides = defineStringList(builder, "playerOffsetOverrides",
+					InventoryInteractionsTranslationHelper.INSTANCE.translConfig("layout.playerOffsetOverrides"), List.of());
 			builder.pop();
 			builder.pop();
 		}
@@ -113,6 +131,11 @@ public class Config {
 		private ModConfigSpec.ConfigValue<List<? extends String>> defineStringList(ModConfigSpec.Builder builder, String key, String translationKey,
 				List<String> defaults) {
 			return builder.translation(translationKey).defineListAllowEmpty(key, defaults, o -> o instanceof String);
+		}
+
+		private ModConfigSpec.ConfigValue<List<? extends String>> defineScreenRules(ModConfigSpec.Builder builder, String group, String action) {
+			String key = group + "." + action + ".screenClasses";
+			return defineStringList(builder, key, InventoryInteractionsTranslationHelper.INSTANCE.translConfig(key), List.of());
 		}
 	}
 }
