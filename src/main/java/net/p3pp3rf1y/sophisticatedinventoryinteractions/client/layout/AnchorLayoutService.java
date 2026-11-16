@@ -3,12 +3,13 @@ package net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.Config;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.ScreenLayoutOffsets.Anchor;
+import net.p3pp3rf1y.sophisticatedinventoryinteractions.client.layout.ScreenLayoutOffsets.Offset;
 import net.p3pp3rf1y.sophisticatedinventoryinteractions.common.slots.SlotRegions;
 
 import javax.annotation.Nullable;
 
 import java.util.Comparator;
-import java.util.List;
 import java.util.Optional;
 
 public class AnchorLayoutService {
@@ -50,7 +51,8 @@ public class AnchorLayoutService {
 		int transferToPlayerX = transferToContainerX - SMALL_BUTTON_SIZE - BUTTON_HORIZONTAL_GAP;
 		int playerRowY = playerAnchorAbsY - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
 
-		Offset override = getOffsetOverride(screen.getClass().getName(), Config.CLIENT.anchorOffsetOverrides.get());
+		Offset override = ScreenLayoutOffsets.get(screen.getClass().getName(), Anchor.CONTAINER);
+		Offset playerOffset = ScreenLayoutOffsets.get(screen.getClass().getName(), Anchor.PLAYER);
 		if (searchLayout != null) {
 			searchLayout = searchLayout.offset(override.x(), override.y());
 		}
@@ -59,7 +61,8 @@ public class AnchorLayoutService {
 			sortByLayout = sortByLayout.offset(override.x(), override.y());
 		}
 
-		return Optional.of(new AnchorLayout(searchLayout, sortLayout, sortByLayout, transferToPlayerX, playerRowY, transferToContainerX, playerRowY));
+		return Optional.of(new AnchorLayout(searchLayout, sortLayout, sortByLayout, transferToPlayerX + playerOffset.x(), playerRowY + playerOffset.y(),
+				transferToContainerX + playerOffset.x(), playerRowY + playerOffset.y()));
 	}
 
 	public Optional<PlayerSortLayout> getPlayerOnlySortLayout(AbstractContainerScreen<?> screen, SlotRegions slotRegions) {
@@ -71,33 +74,11 @@ public class AnchorLayoutService {
 
 		int playerSortX = screen.getLeftPos() + playerMainTopRight.x + 5;
 		int playerSortY = screen.getTopPos() + playerMainTopRight.y - SMALL_BUTTON_SIZE - BUTTON_VERTICAL_MARGIN;
-		Offset override = getOffsetOverride(screen.getClass().getName(), Config.CLIENT.playerSortOffsetOverrides.get());
+		Offset groupOffset = ScreenLayoutOffsets.get(screen.getClass().getName(), Anchor.PLAYER);
+		Offset override = ScreenLayoutOffsets.parse(screen.getClass().getName(), Config.CLIENT.playerSortOffsetOverrides.get()).plus(groupOffset.x(),
+				groupOffset.y());
 
 		return Optional.of(new PlayerSortLayout(playerSortX + override.x(), playerSortY + override.y()));
-	}
-
-	private Offset getOffsetOverride(String screenClassName, List<? extends String> overrides) {
-		for (String overrideEntry : overrides) {
-			String[] classAndOffset = overrideEntry.split("=");
-			if (classAndOffset.length != 2 || !screenClassName.equals(classAndOffset[0])) {
-				continue;
-			}
-			String[] offsets = classAndOffset[1].split(",");
-			if (offsets.length != 2) {
-				continue;
-			}
-			try {
-				return new Offset(Integer.parseInt(offsets[0].trim()), Integer.parseInt(offsets[1].trim()));
-			} catch (NumberFormatException ignored) {
-				return Offset.ZERO;
-			}
-		}
-
-		return Offset.ZERO;
-	}
-
-	private record Offset(int x, int y) {
-		private static final Offset ZERO = new Offset(0, 0);
 	}
 
 	public record AnchorLayout(@Nullable SearchLayout searchLayout, ButtonLayout containerSortLayout, @Nullable ButtonLayout sortByLayout,
